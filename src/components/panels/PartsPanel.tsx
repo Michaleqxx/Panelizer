@@ -13,7 +13,7 @@ type PartRow = ReturnType<typeof buildParts>[number]
 /** Stable identity for a group row, so expand state survives re-derivation. */
 const groupKey = (r: PartRow) => `${r.length}x${r.width}x${r.thickness}@${r.material}`
 
-const CELL = 'px-1 py-1 text-left'
+const CELL = "px-1.5 py-1 text-left"
 
 /** Live list of the project's parts, derived from the panels. Identical parts
  *  are grouped and counted; a group can be expanded to reach each panel on its
@@ -61,15 +61,15 @@ export function PartsPanel() {
       {rows.length === 0 ? (
         <Hint>No panels yet.</Hint>
       ) : (
-        <table className="w-full border-collapse text-xs">
+        <table className="text-small w-full border-collapse">
           <thead>
-            <tr className="text-ink-dim">
+            <tr className="label-micro border-b border-edge">
               <th className="w-4" />
-              <th className={CELL}>Qty</th>
+              <th className={cx(CELL, "text-right")}>Qty</th>
               <th className={CELL}>Part</th>
-              <th className={CELL}>Length</th>
-              <th className={CELL}>Width</th>
-              <th className={CELL}>Thick.</th>
+              <th className={cx(CELL, "text-right")}>Length</th>
+              <th className={cx(CELL, "text-right")}>Width</th>
+              <th className={cx(CELL, "text-right")}>Thick.</th>
               <th className={CELL}>Material</th>
               <th className="w-6" />
             </tr>
@@ -113,7 +113,7 @@ export function PartsPanel() {
         </table>
       )}
 
-      <p className="mt-2 mb-0 text-xs text-ink-dim">
+      <p className="text-micro mt-2 mb-0 text-ink-faint">
         {panels.length} panel{panels.length === 1 ? '' : 's'} · {rows.length} unique part
         {rows.length === 1 ? '' : 's'} · dimensions in {UNIT_SUFFIX[unit]}
       </p>
@@ -153,7 +153,8 @@ function GroupRow({
   return (
     <>
       <tr
-        className={cx('cursor-pointer hover:bg-surface-2', selected && 'bg-accent/15')}
+        className={cx('cursor-pointer border-b border-edge/50 transition-colors hover:bg-surface-2',
+          selected && 'bg-accent/20 hover:bg-accent/25')}
         onClick={onSelect}
         {...tip.trigger}
       >
@@ -175,11 +176,11 @@ function GroupRow({
             </button>
           )}
         </td>
-        <td className={CELL}>{row.quantity}</td>
+        <td className={cx(CELL, "text-right tabular-nums text-ink-dim")}>{row.quantity}</td>
         <td className={cx(CELL, 'text-ink')}>{partNames(row.parts)}</td>
-        <td className={CELL}>{fmt(row.length)}</td>
-        <td className={CELL}>{fmt(row.width)}</td>
-        <td className={CELL}>{fmt(row.thickness)}</td>
+        <td className={cx(CELL, "text-right tabular-nums")}>{fmt(row.length)}</td>
+        <td className={cx(CELL, "text-right tabular-nums")}>{fmt(row.width)}</td>
+        <td className={cx(CELL, "text-right tabular-nums")}>{fmt(row.thickness)}</td>
         <td className={cx(CELL, 'whitespace-nowrap')}>
           <Swatch color={row.color} /> {row.material}
           {tip.node}
@@ -215,8 +216,8 @@ function ChildRow({
   return (
     <tr
       className={cx(
-        'cursor-pointer text-ink-dim hover:bg-surface-2',
-        selected && 'bg-accent/15',
+        'cursor-pointer border-b border-edge/50 text-ink-dim transition-colors hover:bg-surface-2',
+        selected && 'bg-accent/20',
         panel.hidden && 'opacity-50',
       )}
       onClick={onSelect}

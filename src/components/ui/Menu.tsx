@@ -8,12 +8,14 @@ interface MenuProps {
   /** Which edge the popover aligns to. */
   align?: 'left' | 'right'
   ariaLabel?: string
+  /** Trigger styling — `ghost` for triggers sitting inside a segmented group. */
+  variant?: 'default' | 'ghost'
   /** Rendered with a `close` callback so items can dismiss the menu. */
   children: (close: () => void) => ReactNode
 }
 
 /** A button that opens a popover, closing on outside click or Escape. */
-export function Menu({ label, align = 'left', ariaLabel, children }: MenuProps) {
+export function Menu({ label, align = 'left', ariaLabel, variant = 'default', children }: MenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -35,7 +37,12 @@ export function Menu({ label, align = 'left', ariaLabel, children }: MenuProps) 
 
   return (
     <div className="relative" ref={ref}>
-      <Button aria-label={ariaLabel} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <Button
+        variant={variant}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
         {label}
       </Button>
       {open && (

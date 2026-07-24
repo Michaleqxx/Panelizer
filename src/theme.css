@@ -9,21 +9,27 @@
  * and the cut diagrams carry the colour.
  */
 @theme {
-  --color-bg: #14161a;
-  --color-surface: #1e2127;
-  --color-surface-2: #262a31;
-  --color-surface-3: #30353e;
-  --color-edge: #333842;
-  --color-edge-strong: #454b56;
-  --color-ink: #e6e8ec;
-  --color-ink-dim: #9aa0ab;
-  --color-accent: #2a6cff;
-  --color-accent-hover: #3f7cff;
-  --color-danger: #d6533f;
+  /* Surfaces climb toward the viewer: the app canvas is darkest, chrome sits
+     above it, and controls sit above that. Cooler and slightly deeper than a
+     flat grey so the plywood tones in the 3D view read warm against it. */
+  --color-bg: #0e1014;
+  --color-surface: #171a20;
+  --color-surface-2: #1f232b;
+  --color-surface-3: #2a2f39;
+  --color-edge: #262b34;
+  --color-edge-strong: #3a4150;
+
+  --color-ink: #eceef2;
+  --color-ink-dim: #8b93a1;
+  --color-ink-faint: #5f6672;
+
+  --color-accent: #4c86ff;
+  --color-accent-hover: #679bff;
+  --color-danger: #e2604a;
 
   /* Snap-guide + overlay hues, shared with the 3D viewport so the readout and
      the guides agree. */
-  --color-snap-butt: #2a6cff;
+  --color-snap-butt: #4c86ff;
   --color-snap-middle: #ffb02e;
   --color-resize: #ff8a2a;
   --color-overlap: #1fd1c4;
@@ -31,14 +37,28 @@
   --radius-DEFAULT: 6px;
 
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Measurements are read in columns and compared against each other, so every
+     number in the app is tabular. */
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  /* A deliberate type scale, rather than everything at one size:
+     micro  - field labels and section headings (uppercase, tracked)
+     small  - table bodies, hints
+     base   - controls and values */
+  --text-micro: 10.5px;
+  --text-micro--line-height: 1.4;
+  --text-small: 12px;
+  --text-small--line-height: 1.45;
 }
 
 @layer base {
   :root {
     color-scheme: dark;
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: 13px;
     color: var(--color-ink);
+    /* Dense tool UI: keep the glyphs crisp at small sizes. */
+    -webkit-font-smoothing: antialiased;
   }
 
   html,
@@ -51,6 +71,23 @@
   body {
     background: var(--color-bg);
   }
+
+  /* Numbers everywhere line up in columns. */
+  input[type='text'],
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Thin, unobtrusive scrollbars — the panels scroll a lot. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-edge-strong) transparent;
+  }
+}
+
+/** A section heading: small, tracked, uppercase, quiet. */
+@utility label-micro {
+  @apply text-micro font-semibold tracking-[0.08em] text-ink-dim uppercase;
 }
 
 /**

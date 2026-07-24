@@ -17,9 +17,9 @@ export function Section({
   className?: string
 }) {
   return (
-    <section className={cx('border-b border-edge px-3 py-2.5', className)}>
-      <header className="mb-1.5 flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold tracking-wide text-ink-dim uppercase">{title}</h3>
+    <section className={cx('border-b border-edge px-3 py-3 last:border-b-0', className)}>
+      <header className="mb-2 flex h-6 items-center justify-between gap-2">
+        <h3 className="label-micro">{title}</h3>
         {action}
       </header>
       {children}
@@ -29,7 +29,9 @@ export function Section({
 
 /** Muted explanatory text — empty states and inline guidance. */
 export function Hint({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cx('m-0 py-1 text-xs leading-relaxed text-ink-dim', className)}>{children}</p>
+  return (
+    <p className={cx('text-small m-0 py-0.5 leading-relaxed text-ink-faint', className)}>{children}</p>
+  )
 }
 
 /** A material's colour chip, shown beside its name everywhere it appears. */
@@ -37,7 +39,7 @@ export function Swatch({ color }: { color?: string }) {
   return (
     <span
       data-swatch
-      className="inline-block size-3 shrink-0 rounded-xs border border-black/30 align-middle"
+      className="inline-block size-2.5 shrink-0 rounded-full ring-1 ring-black/40 ring-inset"
       style={{ background: color }}
     />
   )

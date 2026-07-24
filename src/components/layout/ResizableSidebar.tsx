@@ -51,12 +51,12 @@ export function ResizableSidebar({ children }: { children: ReactNode }) {
   return (
     <>
       <div
-        className="w-1 shrink-0 cursor-col-resize bg-edge transition-colors hover:bg-accent"
+        className="w-1 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-accent"
         role="separator"
         aria-orientation="vertical"
         onMouseDown={startResize}
       />
-      <aside className="flex shrink-0 flex-col overflow-y-auto bg-surface" style={{ width }}>
+      <aside className="flex shrink-0 flex-col overflow-y-auto border-l border-edge bg-surface" style={{ width }}>
         <div className="flex justify-start border-b border-edge px-1 py-0.5">
           <button
             type="button"

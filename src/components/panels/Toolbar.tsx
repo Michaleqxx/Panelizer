@@ -88,8 +88,8 @@ export function Toolbar() {
 
   return (
     <>
-      <header className="flex shrink-0 items-center gap-2 border-b border-edge bg-surface px-3 py-2 print:hidden">
-        <img src="/Panelizer/logo.png" alt="Panelizer" className="mr-1 h-6 w-auto" />
+      <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-edge bg-surface px-2.5 print:hidden">
+        <img src="/Panelizer/logo.png" alt="Panelizer" className="mr-1.5 h-5 w-auto opacity-90" />
 
         <Menu label="+ Add">
           {(close) => (
@@ -109,7 +109,7 @@ export function Toolbar() {
           )}
         </Menu>
 
-        <div className="flex items-center gap-1" role="group" aria-label="Tools">
+        <div className="ml-1 flex items-center gap-0.5 rounded-md border border-edge bg-bg/60 p-0.5" role="group" aria-label="Tools">
           {TOOL_SECTIONS.map((section) => {
             const active = section.tools.find((t) => t.tool === tool)
 
@@ -119,7 +119,7 @@ export function Toolbar() {
               return (
                 <Button
                   key={section.label}
-                  variant={tool === t ? 'primary' : 'default'}
+                  variant={tool === t ? 'primary' : 'ghost'}
                   onClick={() => setTool(t)}
                 >
                   {label}
@@ -132,11 +132,12 @@ export function Toolbar() {
               <Menu
                 key={section.label}
                 ariaLabel={section.label}
+                variant={active ? 'default' : 'ghost'}
                 label={
-                  <span className={cx('flex items-center gap-1.5', active && 'text-accent')}>
+                  <span className="flex items-center gap-1.5">
                     {section.label}
                     {active && (
-                      <span className="rounded-xs bg-accent/15 px-1 text-xs text-accent">
+                      <span className="text-micro rounded-xs bg-accent/20 px-1 py-px text-accent">
                         {active.label}
                       </span>
                     )}
@@ -165,11 +166,11 @@ export function Toolbar() {
 
         <div className="flex-1" />
 
-        <Button disabled={empty} onClick={() => setCutlistOpen(true)}>
+        <Button variant="primary" disabled={empty} onClick={() => setCutlistOpen(true)}>
           Cutlist
         </Button>
 
-        <Menu label="☰" ariaLabel="Document menu" align="right">
+        <Menu label="☰" ariaLabel="Document menu" align="right" variant="ghost">
           {(close) => (
             <MenuList>
               <MenuLabel>Default document unit</MenuLabel>

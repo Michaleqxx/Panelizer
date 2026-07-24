@@ -7,7 +7,7 @@ import {
   UNIT_SUFFIX,
   type Unit,
 } from '../../lib/units'
-import { CONTROL, Field } from './Field'
+import { CONTROL_NUMERIC, Field } from './Field'
 
 interface MeasurementInputProps {
   label: string
@@ -62,7 +62,7 @@ export function MeasurementInput({ label, value, onChange, unit, precision, min,
       <input
         type="text"
         inputMode="decimal"
-        className={CONTROL}
+        className={CONTROL_NUMERIC}
         value={text}
         onChange={(e) => {
           setText(e.target.value)
