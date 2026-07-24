@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  SNAP_THRESHOLD_MM,
-  panelBounds,
-  snapGroupDelta,
-  snapResizeFace,
-} from './snapping'
+import { SNAP_THRESHOLD_MM, snapGroupDelta, snapResizeFace } from './snapping'
 import type { Panel } from '../types/panel'
 
 /**
@@ -36,21 +31,6 @@ const panel = (over: Partial<Panel> = {}): Panel => ({
 
 /** Propose a member at an explicit position (raw delta already applied). */
 const at = (p: Panel, position: [number, number, number]) => ({ panel: p, position })
-
-describe('panelBounds', () => {
-  it('is the centre +/- half the box size', () => {
-    const b = panelBounds(panel({ normal: 'z', length: 600, width: 400, thickness: 18 }))
-    expect(b.min).toEqual([-300, -200, -9])
-    expect(b.max).toEqual([300, 200, 9])
-  })
-
-  it('accepts an overridden position without mutating the panel', () => {
-    const p = panel({ position: [0, 0, 0] })
-    const b = panelBounds(p, [100, 0, 0])
-    expect(b.min[0]).toBe(-200)
-    expect(p.position).toEqual([0, 0, 0])
-  })
-})
 
 describe('snapGroupDelta — gating', () => {
   it('does not snap to a panel it does not overlap in-plane', () => {

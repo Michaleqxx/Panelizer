@@ -1,5 +1,5 @@
 import type { Panel } from '../types/panel'
-import { panelBounds } from './snapping'
+import { panelBounds } from './bounds'
 
 export type Point = [number, number, number]
 
