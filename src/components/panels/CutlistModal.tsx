@@ -68,9 +68,12 @@ export function CutlistModal() {
         className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-edge bg-bg shadow-2xl print:h-auto print:border-0 print:shadow-none"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex shrink-0 items-center gap-2 border-b border-edge bg-surface px-4 py-2.5 print:hidden">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-edge bg-surface px-4 print:hidden">
           <h2 className="m-0 flex-1 text-base font-semibold">Cutlist</h2>
           <Button onClick={() => window.print()}>Print</Button>
+          {/* Close is fenced off behind a divider so it can't be fat-fingered
+              while reaching for Print. */}
+          <span className="h-5 w-px bg-edge" />
           <Button variant="ghost" icon aria-label="Close" onClick={() => setOpen(false)}>
             ✕
           </Button>

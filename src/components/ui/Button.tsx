@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { cx } from './cx'
 
-type Variant = 'default' | 'primary' | 'ghost' | 'danger'
+type Variant = 'default' | 'primary' | 'ghost' | 'danger' | 'dangerGhost'
 type Size = 'sm' | 'md'
 
 const BASE =
@@ -23,8 +23,17 @@ const VARIANTS: Record<Variant, string> = {
   // dense rows, where a full button outline would be visual noise.
   ghost:
     'bg-transparent border-transparent text-ink-dim enabled:hover:bg-surface-2 enabled:hover:text-ink',
+  // A destructive action that sits next to a normal one (Delete beside
+  // Duplicate) needs the same chrome as its neighbour, or it reads as disabled
+  // rather than as the dangerous option.
   danger:
-    'bg-transparent border-transparent text-ink-faint ' +
+    'bg-surface-2 border-edge-strong text-danger shadow-[inset_0_1px_0_rgb(255_255_255/0.04)] ' +
+    'enabled:hover:bg-danger enabled:hover:border-danger enabled:hover:text-white',
+  // The borderless flavour, for a bare ✕ inside a dense row. Rests at the same
+  // weight as any other secondary icon so it never looks unavailable; the red
+  // only appears once you're on it.
+  dangerGhost:
+    'bg-transparent border-transparent text-ink-dim ' +
     'enabled:hover:bg-danger/15 enabled:hover:text-danger',
 }
 

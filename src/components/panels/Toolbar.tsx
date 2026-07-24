@@ -172,6 +172,10 @@ export function Toolbar() {
           Cutlist
         </Button>
 
+        {/* The document menu is a different kind of thing to the Cutlist action,
+            so it sits past a divider rather than crowding against it. */}
+        <span className="h-5 w-px bg-edge" />
+
         <Menu label="☰" ariaLabel="Document menu" align="right" variant="ghost">
           {(close) => (
             <MenuList>

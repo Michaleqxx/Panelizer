@@ -66,7 +66,7 @@ export function MaterialsPanel() {
             />
 
             <Button
-              variant="danger"
+              variant="dangerGhost"
               icon
               aria-label="Remove material"
               disabled={materials.length === 1}

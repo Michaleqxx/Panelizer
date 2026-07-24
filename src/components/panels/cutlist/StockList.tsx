@@ -127,12 +127,17 @@ function StockEditor({
         <MeasurementInput label="Width" value={stock.width} unit={unit} precision={precision} min={1} snap onChange={(v) => onChange({ width: v })} />
       </div>
 
-      <div className="mt-1.5 flex justify-end gap-1">
-        <Button variant="danger" icon aria-label="Remove stock" onClick={onRemove}>
-          ✕
+      {/* Destructive and confirm sit at opposite ends rather than side by side,
+          so "remove this sheet" can't be mis-clicked when reaching for "done".
+          Both are labelled here — an editor has room, and a bare ✕ next to a
+          bare ✓ is ambiguous. */}
+      <div className="mt-2.5 flex items-center justify-between gap-6">
+        <Button size="sm" variant="dangerGhost" onClick={onRemove}>
+          Remove
         </Button>
-        <Button variant="primary" icon aria-label="Done editing" onClick={onDone}>
+        <Button size="sm" variant="primary" onClick={onDone}>
           <CheckIcon />
+          Done
         </Button>
       </div>
     </div>
@@ -173,7 +178,7 @@ function StockSummary({
         <Button variant="ghost" icon aria-label="Edit stock" onClick={onEdit}>
           <PencilIcon />
         </Button>
-        <Button variant="danger" icon aria-label="Remove stock" onClick={onRemove}>
+        <Button variant="dangerGhost" icon aria-label="Remove stock" onClick={onRemove}>
           ✕
         </Button>
       </span>
