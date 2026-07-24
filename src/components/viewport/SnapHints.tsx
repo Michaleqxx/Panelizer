@@ -1,5 +1,5 @@
 import { Html, Line } from '@react-three/drei'
-import { MM_TO_M } from '../../lib/geometry'
+import { toMetres } from '../../lib/geometry'
 import type { SnapKind } from '../../lib/snapping'
 import { useDesignStore } from '../../store/designStore'
 
@@ -41,10 +41,10 @@ export function SnapHints() {
           const p: Vec3 = [...hint.at]
           p[u] += su * hu
           p[v] += sv * hv
-          return p.map((mm) => mm * MM_TO_M) as Vec3
+          return toMetres(p)
         }
         const points: Vec3[] = [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1), corner(-1, -1)]
-        const labelAt = hint.at.map((mm) => mm * MM_TO_M) as Vec3
+        const labelAt = toMetres(hint.at)
 
         return (
           <group key={i}>

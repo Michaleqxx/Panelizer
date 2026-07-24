@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Vector3 } from 'three'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
 import type { Panel } from '../../types/panel'
-import { MM_TO_M, axisField, panelBoxSize } from '../../lib/geometry'
+import { MM_TO_M, axisField, panelBoxSize, toMetres } from '../../lib/geometry'
 import { roundToUnitGrid } from '../../lib/units'
 import { resizeAlongAxis } from '../../lib/resize'
-import { SNAP_THRESHOLD_MM, snapResizeFace, type SnapHitTarget } from '../../lib/snapping'
+import { SNAP_THRESHOLD_MM, snapHintFromTarget, snapResizeFace, type SnapHitTarget } from '../../lib/snapping'
 import { useDesignStore } from '../../store/designStore'
 
 type Axis3 = 0 | 1 | 2
@@ -25,12 +25,6 @@ function faceCenterMm(panel: Panel, axis: Axis3, faceSign: FaceSign): [number, n
   center[axis] += faceSign * half
   return center
 }
-
-const toM = ([x, y, z]: [number, number, number]): [number, number, number] => [
-  x * MM_TO_M,
-  y * MM_TO_M,
-  z * MM_TO_M,
-]
 
 /** What we freeze at pointer-down so every move is computed against an
  *  immutable starting state — this is what stops the resize from feeding back
@@ -91,7 +85,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
 
   // Faint slab marking the whole face (visual only — never a click target).
   const box = panelBoxSize(panel)
-  const slabSize = toM(box.map((v, i) => (i === axis ? 6 : v)) as [number, number, number])
+  const slabSize = toMetres(box.map((v, i) => (i === axis ? 6 : v)) as [number, number, number])
 
   // Position (m) of the pointer ray projected onto this face's drag axis: the
   // closest point between the axis line (through the frozen point `p0`, along
@@ -116,17 +110,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
   // Show (or clear) the snap guide, drawn on the contact rectangle (the overlap
   // of the two panels) so it marks only where the faces meet.
   const showSnap = (snap: SnapHitTarget | null) => {
-    if (!snap) return setSnapHints([])
-    const at: [number, number, number] = [0, 0, 0]
-    const size: [number, number, number] = [0, 0, 0]
-    for (const k of [0, 1, 2] as const) {
-      if (k === axis) at[k] = snap.plane
-      else {
-        at[k] = (snap.lo[k] + snap.hi[k]) / 2
-        size[k] = Math.max(0, snap.hi[k] - snap.lo[k])
-      }
-    }
-    setSnapHints([{ axis, kind: snap.kind, at, size }])
+    setSnapHints(snap ? [snapHintFromTarget(axis, snap)] : [])
   }
 
   const label = axisField(panel.normal, axis) === 'length' ? 'Length' : 'Width'
@@ -183,7 +167,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
     ;(e.target as Element).setPointerCapture(e.pointerId)
     setOrbit(false)
     gestureOpen.current = false
-    const p0 = new Vector3(...toM(faceCenter))
+    const p0 = new Vector3(...toMetres(faceCenter))
     drag.current = { panel, p0, param0: axisParam(e.ray, p0) }
   }
 
@@ -234,12 +218,12 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
   return (
     <>
       {/* Non-interactive face tint so it's obvious which dimension a handle grows. */}
-      <mesh position={toM(faceCenter)} raycast={() => null}>
+      <mesh position={toMetres(faceCenter)} raycast={() => null}>
         <boxGeometry args={slabSize} />
         <meshBasicMaterial color="#ff8a2a" transparent opacity={hovered ? 0.25 : 0.08} depthWrite={false} />
       </mesh>
 
-      <group position={toM(handleCenter)}>
+      <group position={toMetres(handleCenter)}>
         {/* Larger invisible sphere makes the handle easy to grab. */}
         <mesh
           onPointerOver={(e) => {

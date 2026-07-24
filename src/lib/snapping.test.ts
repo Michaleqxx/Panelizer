@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { SNAP_THRESHOLD_MM, snapGroupDelta, snapResizeFace } from './snapping'
+import {
+  SNAP_THRESHOLD_MM,
+  snapGroupDelta,
+  snapHintFromTarget,
+  snapResizeFace,
+  type SnapHitTarget,
+} from './snapping'
 import type { Panel } from '../types/panel'
 
 /**
@@ -31,6 +37,49 @@ const panel = (over: Partial<Panel> = {}): Panel => ({
 
 /** Propose a member at an explicit position (raw delta already applied). */
 const at = (p: Panel, position: [number, number, number]) => ({ panel: p, position })
+
+describe('snapHintFromTarget', () => {
+  const target: SnapHitTarget = {
+    plane: 40,
+    kind: 'butt',
+    lo: [10, 20, 30],
+    hi: [50, 60, 70],
+  }
+
+  it('pins the guide to the snapped plane on the snap axis', () => {
+    const hint = snapHintFromTarget(0, target)
+    expect(hint.at[0]).toBe(40)
+    // Degenerate on the snap axis — the guide is a flat rectangle.
+    expect(hint.size[0]).toBe(0)
+  })
+
+  it('centres and sizes the guide on the contact rectangle for the other axes', () => {
+    const hint = snapHintFromTarget(0, target)
+    expect(hint.at[1]).toBe(40) // (20 + 60) / 2
+    expect(hint.at[2]).toBe(50) // (30 + 70) / 2
+    expect(hint.size[1]).toBe(40)
+    expect(hint.size[2]).toBe(40)
+  })
+
+  it('carries the axis and kind through', () => {
+    expect(snapHintFromTarget(2, { ...target, kind: 'middle' })).toMatchObject({
+      axis: 2,
+      kind: 'middle',
+    })
+  })
+
+  it('labels by default and honours an explicit false', () => {
+    expect(snapHintFromTarget(0, target).label).toBe(true)
+    expect(snapHintFromTarget(0, target, false).label).toBe(false)
+  })
+
+  it('clamps a negative contact span to zero rather than a negative size', () => {
+    // Boxes that do not reach each other invert the span; a guide must never
+    // be given a negative extent.
+    const inverted: SnapHitTarget = { plane: 0, kind: 'butt', lo: [0, 90, 0], hi: [0, 10, 0] }
+    expect(snapHintFromTarget(0, inverted).size[1]).toBe(0)
+  })
+})
 
 describe('snapGroupDelta — gating', () => {
   it('does not snap to a panel it does not overlap in-plane', () => {

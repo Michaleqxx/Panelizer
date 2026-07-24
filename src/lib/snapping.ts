@@ -78,6 +78,30 @@ export interface SnapHint {
 }
 
 /**
+ * Turn a snapped target into the viewport marker for it: the guide sits on the
+ * snapped plane, and on the other two axes spans the contact rectangle — so it
+ * marks only the patch where the faces actually meet, not the whole face.
+ *
+ * Shared by the move drag (which may report several coincident targets at once,
+ * labelling only the first) and the resize drag (always a single target).
+ */
+export function snapHintFromTarget(axis: 0 | 1 | 2, target: SnapHitTarget, label = true): SnapHint {
+  const at: [number, number, number] = [0, 0, 0]
+  const size: [number, number, number] = [0, 0, 0]
+
+  for (const k of [0, 1, 2] as const) {
+    if (k === axis) {
+      at[k] = target.plane
+    } else {
+      at[k] = (target.lo[k] + target.hi[k]) / 2
+      size[k] = Math.max(0, target.hi[k] - target.lo[k])
+    }
+  }
+
+  return { axis, kind: target.kind, at, size, label }
+}
+
+/**
  * Snap a whole group of panels as one rigid body. Each axis is considered
  * independently: across every group member we look for the single closest
  * snap relationship to a non-group neighbour and return the correction that

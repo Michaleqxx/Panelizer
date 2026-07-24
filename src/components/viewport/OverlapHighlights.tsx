@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { MM_TO_M } from '../../lib/geometry'
+import { toMetres } from '../../lib/geometry'
 import { overlapBoxes } from '../../lib/overlaps'
 import { useDesignStore } from '../../store/designStore'
 
@@ -16,17 +16,8 @@ export function OverlapHighlights() {
   return (
     <>
       {boxes.map((box, i) => (
-        <mesh
-          key={i}
-          position={[box.center[0] * MM_TO_M, box.center[1] * MM_TO_M, box.center[2] * MM_TO_M]}
-        >
-          <boxGeometry
-            args={[
-              (box.size[0] + PAD) * MM_TO_M,
-              (box.size[1] + PAD) * MM_TO_M,
-              (box.size[2] + PAD) * MM_TO_M,
-            ]}
-          />
+        <mesh key={i} position={toMetres(box.center)}>
+          <boxGeometry args={toMetres([box.size[0] + PAD, box.size[1] + PAD, box.size[2] + PAD])} />
           <meshStandardMaterial
             color="#1fd1c4"
             emissive="#1fd1c4"

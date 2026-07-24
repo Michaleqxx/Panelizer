@@ -2,16 +2,14 @@ import { useRef } from 'react'
 import { Mesh } from 'three'
 import { Edges, TransformControls } from '@react-three/drei'
 import type { Panel } from '../../types/panel'
-import { MM_TO_M, panelBoxSize } from '../../lib/geometry'
+import { MM_TO_M, panelBoxSize, toMetres } from '../../lib/geometry'
 import { findMaterial } from '../../lib/materials'
 import { roundToUnitGrid } from '../../lib/units'
-import { SNAP_THRESHOLD_MM, snapGroupDelta } from '../../lib/snapping'
+import { SNAP_THRESHOLD_MM, snapGroupDelta, snapHintFromTarget } from '../../lib/snapping'
 import { useDesignStore } from '../../store/designStore'
 import { ResizeHandles } from './ResizeHandles'
 
 type Vec3 = [number, number, number]
-
-const toMetres = ([x, y, z]: Vec3): Vec3 => [x * MM_TO_M, y * MM_TO_M, z * MM_TO_M]
 
 /** A gesture that moved the primary less than this (mm) is a click, not a drag. */
 const MOVE_THRESHOLD_MM = 0.5
@@ -177,18 +175,7 @@ export function PanelMesh({ panel }: { panel: Panel }) {
         if (!snap || !applies(a)) return []
         // One guide per coincident target, so a flush fit shows both faces —
         // only the first is labelled so the words don't stack.
-        return snap.hits.map((h, i) => {
-          const at: Vec3 = [0, 0, 0]
-          const size: Vec3 = [0, 0, 0]
-          for (const k of [0, 1, 2] as const) {
-            if (k === a) at[k] = h.plane
-            else {
-              at[k] = (h.lo[k] + h.hi[k]) / 2
-              size[k] = Math.max(0, h.hi[k] - h.lo[k])
-            }
-          }
-          return { axis: a, kind: h.kind, at, size, label: i === 0 }
-        })
+        return snap.hits.map((hit, i) => snapHintFromTarget(a, hit, i === 0))
       }),
     )
 

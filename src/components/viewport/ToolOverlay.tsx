@@ -2,12 +2,10 @@ import { useRef, useState } from 'react'
 import { Vector3, type Group } from 'three'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
-import { MM_TO_M } from '../../lib/geometry'
+import { toMetres } from '../../lib/geometry'
 import { distance, panelCorners, type Point } from '../../lib/corners'
 import { formatMeasurement } from '../../lib/units'
 import { useDesignStore } from '../../store/designStore'
-
-const toM = ([x, y, z]: Point): Point => [x * MM_TO_M, y * MM_TO_M, z * MM_TO_M]
 
 const HIT_RADIUS = 0.03 // invisible click target (m)
 const DOT_RADIUS = 0.004 // visible dot (m); grows on hover / selection
@@ -37,7 +35,7 @@ function Corner({
   onPick: () => void
 }) {
   const ref = useRef<Group>(null!)
-  const pos = new Vector3(...toM(world))
+  const pos = new Vector3(...toMetres(world))
 
   useFrame(({ camera }) => {
     if (ref.current) ref.current.scale.setScalar(camera.position.distanceTo(pos) / NOMINAL_DIST)
@@ -154,9 +152,9 @@ export function ToolOverlay() {
 
       {measurement && (
         <>
-          <Line points={[toM(measurement.a), toM(measurement.b)]} color="#2a6cff" lineWidth={2} />
+          <Line points={[toMetres(measurement.a), toMetres(measurement.b)]} color="#2a6cff" lineWidth={2} />
           <Html
-            position={toM([
+            position={toMetres([
               (measurement.a[0] + measurement.b[0]) / 2,
               (measurement.a[1] + measurement.b[1]) / 2,
               (measurement.a[2] + measurement.b[2]) / 2,
