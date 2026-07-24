@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Panel } from '../../types/panel'
-import { buildParts, partNames, partsToCsv } from '../../lib/parts'
+import { buildParts, partsToCsv } from '../../lib/parts'
 import { formatMeasurement, UNIT_SUFFIX, type Unit } from '../../lib/units'
 import { useDesignStore } from '../../store/designStore'
 import { useTooltip } from '../ui/useTooltip'
@@ -13,7 +13,8 @@ type PartRow = ReturnType<typeof buildParts>[number]
 /** Stable identity for a group row, so expand state survives re-derivation. */
 const groupKey = (r: PartRow) => `${r.length}x${r.width}x${r.thickness}@${r.material}`
 
-const CELL = "px-1.5 py-1 text-left"
+const NUM = 'px-1.5 py-1.5 text-right tabular-nums'
+const TXT = 'px-1.5 py-1.5 text-left'
 
 /** Live list of the project's parts, derived from the panels. Identical parts
  *  are grouped and counted; a group can be expanded to reach each panel on its
@@ -61,17 +62,19 @@ export function PartsPanel() {
       {rows.length === 0 ? (
         <Hint>No panels yet.</Hint>
       ) : (
-        <table className="text-small w-full border-collapse">
+        <table className="w-full border-collapse text-[13px]">
           <thead>
-            <tr className="label-micro border-b border-edge">
-              <th className="w-4" />
-              <th className={cx(CELL, "text-right")}>Qty</th>
-              <th className={CELL}>Part</th>
-              <th className={cx(CELL, "text-right")}>Length</th>
-              <th className={cx(CELL, "text-right")}>Width</th>
-              <th className={cx(CELL, "text-right")}>Thick.</th>
-              <th className={CELL}>Material</th>
-              <th className="w-6" />
+            <tr className="label-micro border-b border-edge-strong">
+              {/* Visibility leads: it's the control you reach for while reading
+                  down the list, so it gets the leftmost, easiest column. */}
+              <th className="w-7" />
+              <th className="w-5" />
+              <th className={cx(NUM, 'w-8')}>Qty</th>
+              <th className={TXT}>Part</th>
+              <th className={NUM}>Length</th>
+              <th className={NUM}>Width</th>
+              <th className={NUM}>Thick.</th>
+              <th className={TXT}>Material</th>
             </tr>
           </thead>
           <tbody>
@@ -100,6 +103,8 @@ export function PartsPanel() {
                           key={id}
                           panel={child}
                           name={r.parts[i]}
+                          index={i}
+                          last={i === r.ids.length - 1}
                           selected={selectedIds.includes(id)}
                           onSelect={() => select(id)}
                           onToggleHidden={() => setHidden([id], !child.hidden)}
@@ -121,10 +126,58 @@ export function PartsPanel() {
   )
 }
 
-/** A grouped parts row: expand chevron (multi-part groups only), the shared
- *  dimensions, and an eye that hides/shows the whole group. Clicking the row
- *  cycles the selection through its panels. Its expanded child rows are passed
- *  in as `children` so they sit directly beneath it in the table body. */
+/**
+ * The group's part name(s), kept to one line. A group is usually all one name
+ * ("Side"), but differently-named panels can share a size — rather than letting
+ * "Side, Side copy, Side copy 2…" push the dimensions off the row, only the
+ * first name is shown and the rest collapse into a `+n` chip that names them on
+ * hover. Expanding the group lists them all anyway.
+ */
+function PartNames({ names }: { names: string[] }) {
+  const distinct = [...new Set(names)]
+  const [first, ...rest] = distinct
+  const tip = useTooltip(distinct.join(', '))
+
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      <span className="truncate">{first}</span>
+      {rest.length > 0 && (
+        <span
+          className="text-micro shrink-0 cursor-help rounded-full bg-surface-3 px-1.5 py-px text-ink-dim"
+          {...tip.trigger}
+        >
+          +{rest.length}
+          {tip.node}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** A chevron that points right when closed and down when open. */
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cx('transition-transform duration-100', open && 'rotate-90')}
+      aria-hidden
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  )
+}
+
+/** A grouped parts row: visibility eye, expand chevron (multi-part groups
+ *  only), the shared dimensions. Clicking the row cycles the selection through
+ *  its panels. Its expanded child rows are passed in as `children` so they sit
+ *  directly beneath it in the table body. */
 function GroupRow({
   row,
   unit,
@@ -153,44 +206,52 @@ function GroupRow({
   return (
     <>
       <tr
-        className={cx('cursor-pointer border-b border-edge/50 transition-colors hover:bg-surface-2',
-          selected && 'bg-accent/20 hover:bg-accent/25')}
+        className={cx(
+          'cursor-pointer transition-colors',
+          // An open group reads as a header for the rows it owns: it keeps the
+          // raised surface and drops its bottom rule so it joins onto them.
+          open ? 'bg-surface-2' : 'border-b border-edge/60 hover:bg-surface-2',
+          selected && 'bg-accent/20 hover:bg-accent/25',
+        )}
         onClick={onSelect}
         {...tip.trigger}
       >
-        <td className="w-4">
-          {expandable && (
-            <button
-              type="button"
-              className={cx(
-                'cursor-pointer border-0 bg-transparent p-0 text-ink-dim transition-transform hover:text-ink',
-                open && 'rotate-90',
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleOpen()
-              }}
-              aria-label={open ? 'Collapse group' : 'Expand group'}
-            >
-              ▸
-            </button>
-          )}
-        </td>
-        <td className={cx(CELL, "text-right tabular-nums text-ink-dim")}>{row.quantity}</td>
-        <td className={cx(CELL, 'text-ink')}>{partNames(row.parts)}</td>
-        <td className={cx(CELL, "text-right tabular-nums")}>{fmt(row.length)}</td>
-        <td className={cx(CELL, "text-right tabular-nums")}>{fmt(row.width)}</td>
-        <td className={cx(CELL, "text-right tabular-nums")}>{fmt(row.thickness)}</td>
-        <td className={cx(CELL, 'whitespace-nowrap')}>
-          <Swatch color={row.color} /> {row.material}
-          {tip.node}
-        </td>
-        <td className="w-6">
+        <td className="w-7 pl-1">
           <EyeButton
             hidden={allHidden}
             onToggle={onToggleHidden}
             label={allHidden ? 'Show all in group' : 'Hide all in group'}
           />
+        </td>
+        <td className="w-5">
+          {expandable && (
+            <button
+              type="button"
+              className="flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0.5 text-ink-dim hover:bg-surface-3 hover:text-ink"
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleOpen()
+              }}
+              aria-label={open ? 'Collapse group' : 'Expand group'}
+              aria-expanded={open}
+            >
+              <Chevron open={open} />
+            </button>
+          )}
+        </td>
+        <td className={cx(NUM, 'w-8 text-ink-dim')}>{row.quantity}</td>
+        <td className={cx(TXT, 'font-medium text-ink')}>
+          <PartNames names={row.parts} />
+        </td>
+        <td className={NUM}>{fmt(row.length)}</td>
+        <td className={NUM}>{fmt(row.width)}</td>
+        <td className={NUM}>{fmt(row.thickness)}</td>
+        <td className={cx(TXT, 'whitespace-nowrap')}>
+          <span className="flex items-center gap-1.5">
+            <Swatch color={row.color} />
+            <span className="truncate text-ink-dim">{row.material}</span>
+          </span>
+          {tip.node}
         </td>
       </tr>
       {children}
@@ -199,16 +260,21 @@ function GroupRow({
 }
 
 /** One panel inside an expanded group: its own name, selectable and hideable
- *  independently of its siblings. */
+ *  independently of its siblings. Sits on a recessed surface behind a left rail
+ *  so it clearly belongs to the group above it. */
 function ChildRow({
   panel,
   name,
+  index,
+  last,
   selected,
   onSelect,
   onToggleHidden,
 }: {
   panel: Panel
   name: string
+  index: number
+  last: boolean
   selected: boolean
   onSelect: () => void
   onToggleHidden: () => void
@@ -216,24 +282,29 @@ function ChildRow({
   return (
     <tr
       className={cx(
-        'cursor-pointer border-b border-edge/50 text-ink-dim transition-colors hover:bg-surface-2',
-        selected && 'bg-accent/20',
-        panel.hidden && 'opacity-50',
+        'cursor-pointer bg-bg/60 text-[12px] transition-colors hover:bg-surface-2',
+        selected && 'bg-accent/20 hover:bg-accent/25',
+        last && 'border-b border-edge-strong',
+        panel.hidden && 'text-ink-faint',
       )}
       onClick={onSelect}
     >
-      <td className="w-4" />
-      <td />
-      <td className={cx(CELL, 'pl-2')} colSpan={4}>
-        {name}
-      </td>
-      <td className="w-6">
+      <td className="w-7 pl-1">
         <EyeButton
           hidden={panel.hidden === true}
           onToggle={onToggleHidden}
           label={panel.hidden ? 'Show panel' : 'Hide panel'}
         />
       </td>
+      {/* The rail runs down the chevron column, tying every child to its group. */}
+      <td className="w-5">
+        <span className="ml-[6px] block h-6 w-px bg-edge-strong" />
+      </td>
+      <td className={cx(NUM, 'w-8 text-ink-faint')}>{index + 1}</td>
+      <td className={cx(TXT, 'text-ink-dim')} colSpan={4}>
+        {name}
+      </td>
+      <td />
     </tr>
   )
 }
@@ -245,8 +316,8 @@ function EyeButton({ hidden, onToggle, label }: { hidden: boolean; onToggle: () 
     <button
       type="button"
       className={cx(
-        'cursor-pointer border-0 bg-transparent p-0.5 hover:text-ink',
-        hidden ? 'text-ink-dim/50' : 'text-ink-dim',
+        'flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 transition-colors',
+        hidden ? 'text-ink-faint hover:text-ink-dim' : 'text-ink-dim hover:bg-surface-3 hover:text-ink',
       )}
       onClick={(e) => {
         e.stopPropagation()

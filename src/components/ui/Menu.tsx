@@ -8,8 +8,9 @@ interface MenuProps {
   /** Which edge the popover aligns to. */
   align?: 'left' | 'right'
   ariaLabel?: string
-  /** Trigger styling — `ghost` for triggers sitting inside a segmented group. */
-  variant?: 'default' | 'ghost'
+  /** Trigger styling — `ghost` for triggers sitting inside a segmented group,
+   *  `primary` when the trigger represents the active choice. */
+  variant?: 'default' | 'ghost' | 'primary'
   /** Rendered with a `close` callback so items can dismiss the menu. */
   children: (close: () => void) => ReactNode
 }

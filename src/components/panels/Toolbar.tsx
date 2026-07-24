@@ -88,8 +88,8 @@ export function Toolbar() {
 
   return (
     <>
-      <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-edge bg-surface px-2.5 print:hidden">
-        <img src="/Panelizer/logo.png" alt="Panelizer" className="mr-1.5 h-5 w-auto opacity-90" />
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-edge bg-surface px-3 print:hidden">
+        <img src="/Panelizer/logo.png" alt="Panelizer" className="h-5 w-auto opacity-90" />
 
         <Menu label="+ Add">
           {(close) => (
@@ -109,7 +109,7 @@ export function Toolbar() {
           )}
         </Menu>
 
-        <div className="ml-1 flex items-center gap-0.5 rounded-md border border-edge bg-bg/60 p-0.5" role="group" aria-label="Tools">
+        <div className="flex items-center gap-1 rounded-md border border-edge bg-bg/60 p-1" role="group" aria-label="Tools">
           {TOOL_SECTIONS.map((section) => {
             const active = section.tools.find((t) => t.tool === tool)
 
@@ -127,17 +127,19 @@ export function Toolbar() {
               )
             }
 
-            // Multi-mode bucket: a dropdown showing the active sub-mode.
+            // Multi-mode bucket: a dropdown showing the active sub-mode. Wears
+            // the same `primary` fill as a lit single-mode button, so "this is
+            // the active tool" reads identically across the whole group.
             return (
               <Menu
                 key={section.label}
                 ariaLabel={section.label}
-                variant={active ? 'default' : 'ghost'}
+                variant={active ? 'primary' : 'ghost'}
                 label={
                   <span className="flex items-center gap-1.5">
                     {section.label}
                     {active && (
-                      <span className="text-micro rounded-xs bg-accent/20 px-1 py-px text-accent">
+                      <span className="text-micro rounded-xs bg-white/20 px-1 py-px text-white">
                         {active.label}
                       </span>
                     )}
