@@ -41,7 +41,7 @@ export function ConfirmHost() {
         <h2 className="m-0 border-b border-edge px-4 py-3 text-base font-semibold">{request.title}</h2>
         <div className="text-small px-4 py-3 leading-relaxed text-ink-dim">{request.body}</div>
         <div className="flex justify-end gap-3 border-t border-edge px-4 py-3">
-          <Button onClick={() => settle(false)}>Cancel</Button>
+          {!request.dismissOnly && <Button onClick={() => settle(false)}>Cancel</Button>}
           <Button
             variant={request.destructive ? 'danger' : 'primary'}
             autoFocus

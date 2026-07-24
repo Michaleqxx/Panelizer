@@ -7,6 +7,9 @@ export interface ConfirmRequest {
   confirmLabel?: string
   /** Style the accept button as destructive. */
   destructive?: boolean
+  /** Just telling the user something — drops Cancel, since there is no choice
+   *  to decline. Replaces the old `alert()` calls. */
+  dismissOnly?: boolean
 }
 
 /** Internal: the pending request, plus how to answer it. */

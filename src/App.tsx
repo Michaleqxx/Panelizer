@@ -10,6 +10,7 @@ import { GestureReadout } from './components/viewport/GestureReadout'
 import { ResizableSidebar } from './components/layout/ResizableSidebar'
 import { ConfirmHost } from './components/ui/ConfirmDialog'
 import { useDesignStore } from './store/designStore'
+import { useSharedLink } from './components/layout/useSharedLink'
 
 /** Whether a keystroke should be left to the focused field rather than treated
  *  as a global shortcut. */
@@ -20,6 +21,8 @@ const isTyping = (el: EventTarget | null): boolean =>
 export default function App() {
   const undo = useDesignStore((s) => s.undo)
   const redo = useDesignStore((s) => s.redo)
+
+  useSharedLink()
 
   // Global undo / redo. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes (both
   // conventions work). Skipped while typing in a field so text edits keep their

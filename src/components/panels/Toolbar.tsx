@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import type { Panel } from '../../types/panel'
 import { useDesignStore, type Tool } from '../../store/designStore'
 import { downloadDesign, parse } from '../../lib/persistence'
+import { designToLink } from '../../lib/share'
 import { defaultThinThickness } from '../../lib/panel'
 import { DOCUMENT_UNITS, IMPERIAL_PRECISIONS, sameSystem, type Unit } from '../../lib/units'
 import { Menu, MenuChoices, MenuItem, MenuLabel, MenuList } from '../ui/Menu'
@@ -79,6 +80,38 @@ export function Toolbar() {
     convertUnit(next)
   }
 
+  // The whole design travels inside the link, so there is nothing to upload and
+  // no server involved. Copying can fail (denied permission, insecure origin),
+  // so the link is always shown as well rather than only promised.
+  const share = async (close: () => void) => {
+    close()
+    const link = await designToLink({ panels, materials, stocks, unit, precision, kerf, margin })
+
+    let copied = false
+    try {
+      await navigator.clipboard.writeText(link)
+      copied = true
+    } catch {
+      // Fall through — the dialog shows the link either way.
+    }
+
+    await confirm({
+      title: copied ? 'Link copied' : 'Share link',
+      body: (
+        <>
+          <p className="m-0 mb-2">
+            {copied
+              ? 'The link is on your clipboard. Anyone who opens it gets this design.'
+              : 'Copy this link — anyone who opens it gets this design.'}
+          </p>
+          <p className="m-0 break-all text-ink-faint select-all">{link}</p>
+        </>
+      ),
+      confirmLabel: 'Done',
+      dismissOnly: true,
+    })
+  }
+
   const handleImport = async (file: File) => {
     try {
       loadDesign(parse(await file.text()))
@@ -87,6 +120,7 @@ export function Toolbar() {
         title: 'Could not import that file',
         body: error instanceof Error ? error.message : 'Could not read that file.',
         confirmLabel: 'OK',
+        dismissOnly: true,
       })
     }
   }
@@ -192,11 +226,28 @@ export function Toolbar() {
           <Menu label="☰" ariaLabel="Document menu" align="right" variant="ghost">
           {(close) => (
             <MenuList>
+              {/* Unit and precision are one decision — precision only means
+                  anything in inches — so they sit together, above the file
+                  actions. */}
               <MenuLabel>Default document unit</MenuLabel>
               <MenuChoices options={DOCUMENT_UNITS} value={unit} onChange={changeUnit} />
 
+              {unit === 'inch' && (
+                <>
+                  <MenuLabel>Precision</MenuLabel>
+                  <MenuChoices
+                    options={IMPERIAL_PRECISIONS.map((p) => ({ value: p, label: `1/${p}` }))}
+                    value={precision}
+                    onChange={setPrecision}
+                  />
+                </>
+              )}
+
               {DIVIDER}
 
+              <MenuItem disabled={empty} onClick={() => void share(close)}>
+                Share link…
+              </MenuItem>
               <MenuItem
                 disabled={empty}
                 onClick={() => {
@@ -214,17 +265,6 @@ export function Toolbar() {
               >
                 Import…
               </MenuItem>
-
-              {unit === 'inch' && (
-                <>
-                  <MenuLabel>Precision</MenuLabel>
-                  <MenuChoices
-                    options={IMPERIAL_PRECISIONS.map((p) => ({ value: p, label: `1/${p}` }))}
-                    value={precision}
-                    onChange={setPrecision}
-                  />
-                </>
-              )}
 
               {DIVIDER}
 
