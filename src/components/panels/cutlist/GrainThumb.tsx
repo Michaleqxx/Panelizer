@@ -16,12 +16,16 @@ export function GrainThumb({
   length,
   width,
   grain,
+  mixed = false,
   onClick,
   tipProps,
 }: {
   length: number
   width: number
   grain: Grain
+  /** The parts under this row don't agree — show that rather than picking one
+   *  of them to display, which would misreport the others. */
+  mixed?: boolean
   onClick: () => void
   tipProps: (text: string) => object
 }) {
@@ -33,12 +37,18 @@ export function GrainThumb({
   const w = Math.max(4, footW * scale)
   const h = Math.max(4, footH * scale)
 
-  const glyph = grain === 'none' ? '↻' : '↔'
-  const title = `${GRAIN_LABEL[grain]} · click to change`
+  const glyph = mixed ? '≠' : grain === 'none' ? '↻' : '↔'
+  const title = mixed
+    ? 'Mixed orientations · click to match them up, or expand to set each'
+    : `${GRAIN_LABEL[grain]} · click to change`
 
   return (
     <svg
-      className="cursor-pointer fill-ink-dim/70 outline-none hover:fill-ink"
+      className={
+        mixed
+          ? 'cursor-pointer fill-ink-faint/50 outline-none hover:fill-ink-dim'
+          : 'cursor-pointer fill-ink-dim/70 outline-none hover:fill-ink'
+      }
       width={BOX_W}
       height={BOX_H}
       role="button"
