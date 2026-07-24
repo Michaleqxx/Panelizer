@@ -3,6 +3,7 @@ import {
   detectDisplayUnit,
   evaluateMeasurement,
   formatMeasurement,
+  formatMeasurementPlain,
   fromMm,
   gridStepMm,
   isImperial,
@@ -209,6 +210,39 @@ describe('formatMeasurement', () => {
 
   it('rounds a hair under a whole inch up to the whole number', () => {
     expect(formatMeasurement(1.9999 * IN, 'inch')).toBe('2')
+  })
+})
+
+describe('formatMeasurementPlain', () => {
+  it('writes inch fractions in ASCII for editing', () => {
+    expect(formatMeasurementPlain(0.75 * IN, 'inch')).toBe('3/4')
+    expect(formatMeasurementPlain(23.75 * IN, 'inch')).toBe('23 3/4')
+    expect(formatMeasurementPlain((1 / 16) * IN, 'inch')).toBe('1/16')
+    expect(formatMeasurementPlain(-0.75 * IN, 'inch')).toBe('-3/4')
+  })
+
+  it('matches the glyph form for whole inches', () => {
+    expect(formatMeasurementPlain(2 * IN, 'inch')).toBe('2')
+    expect(formatMeasurementPlain(0, 'inch')).toBe('0')
+    expect(formatMeasurementPlain(1.9999 * IN, 'inch')).toBe('2')
+  })
+
+  it('is identical to the glyph form in metric', () => {
+    for (const mm of [0, 24, 24.4, 105, -12]) {
+      expect(formatMeasurementPlain(mm, 'mm')).toBe(formatMeasurement(mm, 'mm'))
+      expect(formatMeasurementPlain(mm, 'cm')).toBe(formatMeasurement(mm, 'cm'))
+    }
+  })
+
+  it('round-trips: both forms parse back to the same value', () => {
+    // The point of the swap is that editing changes only the display, never
+    // the value the field will commit.
+    for (let sixtyFourths = -640; sixtyFourths <= 640; sixtyFourths++) {
+      const mm = (sixtyFourths / 64) * IN
+      const glyph = formatMeasurement(mm, 'inch')
+      const plain = formatMeasurementPlain(mm, 'inch')
+      expect(parseMeasurement(plain, 'inch')).toBeCloseTo(parseMeasurement(glyph, 'inch')!, 8)
+    }
   })
 })
 

@@ -273,20 +273,47 @@ function reduceFraction(numerator: number, denominator: number): [number, number
   return [numerator, denominator]
 }
 
-function formatInches(value: number): string {
+/** An inch value split into the pieces both renderings need. */
+function inchParts(value: number) {
   const sign = value < 0 ? '-' : ''
   const abs = Math.abs(value)
   const whole = Math.floor(abs)
-
   const sixtyFourths = Math.round((abs - whole) * 64)
-  if (sixtyFourths === 64) return `${sign}${whole + 1}`
-  if (sixtyFourths === 0) return `${sign}${whole}`
+
+  if (sixtyFourths === 64) return { sign, whole: whole + 1, fraction: null }
+  if (sixtyFourths === 0) return { sign, whole, fraction: null }
 
   const [numerator, denominator] = reduceFraction(sixtyFourths, 64)
+  return { sign, whole, fraction: { numerator, denominator } }
+}
+
+function formatInches(value: number): string {
+  const { sign, whole, fraction } = inchParts(value)
+  if (!fraction) return `${sign}${whole}`
+
   // Compact mixed number: no space between whole and fraction, fraction drawn
   // small (`23³⁄₄`). A bare fraction (whole 0) drops the leading `0`.
-  const fraction = `${glyphs(numerator, SUP)}⁄${glyphs(denominator, SUB)}`
-  return whole > 0 ? `${sign}${whole}${fraction}` : `${sign}${fraction}`
+  const glyph = `${glyphs(fraction.numerator, SUP)}⁄${glyphs(fraction.denominator, SUB)}`
+  return whole > 0 ? `${sign}${whole}${glyph}` : `${sign}${glyph}`
+}
+
+/**
+ * The same value as {@link formatMeasurement}, but written in plain ASCII
+ * (`23 3/4`) instead of compact glyphs (`23³⁄₄`).
+ *
+ * This is what a field shows while it has focus. The glyph form is lovely to
+ * read in a table but miserable to edit — the caret has to step through
+ * single-character superscripts and a fraction slash, and backspacing leaves
+ * nonsense. Only the display form differs; both parse back to the same value.
+ */
+export function formatMeasurementPlain(mm: number, unit: Unit): string {
+  if (unit !== 'inch') return formatMeasurement(mm, unit)
+
+  const { sign, whole, fraction } = inchParts(fromMm(mm, unit))
+  if (!fraction) return `${sign}${whole}`
+
+  const plain = `${fraction.numerator}/${fraction.denominator}`
+  return whole > 0 ? `${sign}${whole} ${plain}` : `${sign}${plain}`
 }
 
 /** Reverse of the compact inch glyphs, so a displayed value (`23³⁄₄`) still

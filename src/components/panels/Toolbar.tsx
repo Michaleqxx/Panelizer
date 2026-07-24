@@ -93,8 +93,11 @@ export function Toolbar() {
 
   return (
     <>
-      <header className="flex h-13 shrink-0 items-center gap-5 border-b border-edge bg-surface px-4 print:hidden">
-        <img src="/Panelizer/logo.png" alt="Panelizer" className="h-5 w-auto opacity-90" />
+      {/* Spacing is per-cluster, not one uniform gap: separate clusters need
+          room between them, but the members of a cluster belong together and
+          look adrift if given the same. */}
+      <header className="flex h-13 shrink-0 items-center border-b border-edge bg-surface px-4 print:hidden">
+        <img src="/Panelizer/logo.png" alt="Panelizer" className="mr-4 h-5 w-auto opacity-90" />
 
         <Menu label="+ Add">
           {(close) => (
@@ -114,7 +117,11 @@ export function Toolbar() {
           )}
         </Menu>
 
-        <div className="flex items-center gap-2 rounded-md border border-edge bg-bg/60 p-1.5" role="group" aria-label="Tools">
+        <div
+          className="ml-6 flex items-center gap-2 rounded-md border border-edge bg-bg/60 p-1.5"
+          role="group"
+          aria-label="Tools"
+        >
           {TOOL_SECTIONS.map((section) => {
             const active = section.tools.find((t) => t.tool === tool)
 
@@ -173,15 +180,16 @@ export function Toolbar() {
 
         <div className="flex-1" />
 
-        <Button variant="primary" disabled={empty} onClick={() => setCutlistOpen(true)}>
-          Cutlist
-        </Button>
+        {/* Cutlist and the document menu are one cluster — the divider marks
+            them as different kinds of control without pushing them apart. */}
+        <div className="flex items-center gap-2">
+          <Button variant="primary" disabled={empty} onClick={() => setCutlistOpen(true)}>
+            Cutlist
+          </Button>
 
-        {/* The document menu is a different kind of thing to the Cutlist action,
-            so it sits past a divider rather than crowding against it. */}
-        <span className="h-6 w-px bg-edge" />
+          <span className="h-6 w-px bg-edge" />
 
-        <Menu label="☰" ariaLabel="Document menu" align="right" variant="ghost">
+          <Menu label="☰" ariaLabel="Document menu" align="right" variant="ghost">
           {(close) => (
             <MenuList>
               <MenuLabel>Default document unit</MenuLabel>
@@ -252,7 +260,8 @@ export function Toolbar() {
               </MenuItem>
             </MenuList>
           )}
-        </Menu>
+          </Menu>
+        </div>
 
         <input
           ref={fileInput}

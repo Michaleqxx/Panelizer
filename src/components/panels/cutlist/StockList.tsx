@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Stock } from '../../../lib/stock'
 import { formatMeasurement, type Unit } from '../../../lib/units'
 import { useDesignStore } from '../../../store/designStore'
@@ -6,7 +6,7 @@ import { MeasurementInput } from '../../ui/MeasurementInput'
 import { Button } from '../../ui/Button'
 import { CONTROL, Field } from '../../ui/Field'
 import { Hint, Section, Swatch } from '../../ui/Panel'
-import { CheckIcon, PencilIcon, TrashIcon } from './icons'
+import { CheckIcon, PencilIcon } from './icons'
 
 /**
  * Kerf/margin settings plus the sheet-goods inventory. Each stock row collapses
@@ -59,7 +59,6 @@ export function StockList({ unit, precision }: { unit: Unit; precision: number }
               unit={unit}
               precision={precision}
               onChange={(patch) => updateStock(stock.id, patch)}
-              onRemove={() => removeStock(stock.id)}
               onDone={() => setEditing(null)}
             />
           ) : (
@@ -82,17 +81,20 @@ function StockEditor({
   unit,
   precision,
   onChange,
-  onRemove,
   onDone,
 }: {
   stock: Stock
   unit: Unit
   precision: number
   onChange: (patch: Partial<Stock>) => void
-  onRemove: () => void
   onDone: () => void
 }) {
   const materials = useDesignStore((s) => s.materials)
+
+  // Edits apply live — the nesting preview on the right re-runs as you type, so
+  // there is nothing "pending" to throw away. Cancel therefore means *restore*:
+  // snapshot the row as it was when editing began and write it back.
+  const original = useRef(stock)
 
   return (
     <div className="mb-1.5 rounded border border-edge bg-surface-2 p-2">
@@ -127,14 +129,17 @@ function StockEditor({
         <MeasurementInput label="Width" value={stock.width} unit={unit} precision={precision} min={1} snap onChange={(v) => onChange({ width: v })} />
       </div>
 
-      {/* There is no "cancel": edits apply live and are undoable with Ctrl+Z.
-          The other button deletes the sheet, which a bare ✕ beside a bare ✓
-          read as "cancel" — so it is spelled out, carries a bin, and stays red
-          at rest, well away from the confirm. */}
-      <div className="mt-2.5 flex items-center justify-between gap-6 border-t border-edge pt-2">
-        <Button size="sm" variant="danger" onClick={onRemove}>
-          <TrashIcon />
-          Delete sheet
+      {/* Deleting the sheet lives on the collapsed row, so this pair is only
+          ever "keep" or "put it back". */}
+      <div className="mt-2.5 flex items-center justify-end gap-2 border-t border-edge pt-2">
+        <Button
+          size="sm"
+          onClick={() => {
+            onChange(original.current)
+            onDone()
+          }}
+        >
+          Cancel
         </Button>
         <Button size="sm" variant="primary" onClick={onDone}>
           <CheckIcon />
@@ -175,7 +180,7 @@ function StockSummary({
         {stock.quantity ? `${stock.quantity}×` : '∞'}
       </span>
       {/* Actions stay quiet until the row is hovered or focused. */}
-      <span className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+      <span className="ml-1 flex shrink-0 gap-2 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
         <Button variant="ghost" icon aria-label="Edit stock" onClick={onEdit}>
           <PencilIcon />
         </Button>

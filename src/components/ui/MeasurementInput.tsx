@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   evaluateMeasurement,
   formatMeasurement,
+  formatMeasurementPlain,
   roundToUnitGrid,
   sameSystem,
   UNIT_SUFFIX,
@@ -68,7 +69,12 @@ export function MeasurementInput({ label, value, onChange, unit, precision, min,
           setText(e.target.value)
           setDirty(true)
         }}
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          setFocused(true)
+          // Swap the compact glyph fraction for plain ASCII while editing —
+          // a caret can't be moved sensibly through `¹⁄₄`.
+          setText(formatMeasurementPlain(value, unit))
+        }}
         onBlur={() => {
           setFocused(false)
           if (dirty) commit()

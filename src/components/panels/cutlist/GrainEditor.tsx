@@ -54,11 +54,20 @@ export function GrainEditor({
               parts list gives an expanded group. */}
           <div className="flex items-center gap-1.5 rounded-t border-b border-edge-strong bg-surface-2 px-1.5 py-1">
             <Swatch color={group.color} />
-            <span className="text-[13px] font-medium text-ink">{group.material}</span>
-            <span className="text-small text-ink-dim tabular-nums">· {fmt(group.thickness)}</span>
+            <span className="min-w-0 truncate text-[13px] font-medium text-ink">{group.material}</span>
+            <span className="text-small shrink-0 text-ink-dim tabular-nums">· {fmt(group.thickness)}</span>
           </div>
 
-          <table className="w-full border-collapse text-[13px]">
+          {/* Fixed layout: a long part name must eat into its own column and
+              truncate, never squeeze the dimensions into a three-line wrap. */}
+          <table className="w-full table-fixed border-collapse text-[13px]">
+            <colgroup>
+              <col className="w-7" />
+              <col />
+              <col className="w-9" />
+              <col className="w-[7.5rem]" />
+              <col className="w-12" />
+            </colgroup>
             <tbody>
               {group.rows.map((row, i) => {
                 const note = unplacedNote(row.ids)
@@ -94,7 +103,7 @@ export function GrainEditor({
                         )}
                       />
                     </td>
-                    <td className={cx('py-1.5 pr-1', included && 'text-ink')}>
+                    <td className={cx('overflow-hidden py-1.5 pr-1', included && 'text-ink')}>
                       <span className="flex min-w-0 items-center gap-1">
                         <PartNames names={row.parts} />
                         {note && (
@@ -104,11 +113,11 @@ export function GrainEditor({
                         )}
                       </span>
                     </td>
-                    <td className="w-8 py-1.5 text-right text-ink-dim tabular-nums">{row.quantity}×</td>
-                    <td className="py-1.5 pl-2 text-right text-ink-dim tabular-nums">
+                    <td className="py-1.5 text-right text-ink-dim tabular-nums">{row.quantity}×</td>
+                    <td className="py-1.5 pl-2 text-right whitespace-nowrap text-ink-dim tabular-nums">
                       {fmt(row.length)} × {fmt(row.width)}
                     </td>
-                    <td className="w-12 py-1 pl-1.5">
+                    <td className="py-1 pl-1.5">
                       <GrainThumb
                         length={panel?.length ?? row.length}
                         width={panel?.width ?? row.width}

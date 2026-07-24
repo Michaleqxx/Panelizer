@@ -63,17 +63,30 @@ export function PartsPanel() {
       {rows.length === 0 ? (
         <Hint>No panels yet.</Hint>
       ) : (
-        <table className="w-full border-collapse text-[13px]">
+        // Fixed layout: a long part name must eat into its own column and
+        // truncate, never squeeze the measurements into a multi-line wrap.
+        <table className="w-full table-fixed border-collapse text-[13px]">
+          <colgroup>
+            <col className="w-7" />
+            <col className="w-5" />
+            <col className="w-8" />
+            <col />
+            <col className="w-[6.5rem]" />
+            <col className="w-14" />
+            <col className="w-24" />
+          </colgroup>
           <thead>
             <tr className="label-micro border-b border-edge-strong">
               {/* Visibility leads: it's the control you reach for while reading
                   down the list, so it gets the leftmost, easiest column. */}
-              <th className="w-7" />
-              <th className="w-5" />
-              <th className={cx(NUM, 'w-8')}>Qty</th>
+              <th />
+              <th />
+              <th className={NUM}>Qty</th>
               <th className={TXT}>Part</th>
-              <th className={NUM}>Length</th>
-              <th className={NUM}>Width</th>
+              {/* Length and width share a column: eight columns will not fit a
+                  sidebar, and the pair reads as one measurement anyway. The CSV
+                  export still carries them separately. */}
+              <th className={NUM}>Size</th>
               <th className={NUM}>Thick.</th>
               <th className={TXT}>Material</th>
             </tr>
@@ -189,14 +202,14 @@ function GroupRow({
         onClick={onSelect}
         {...tip.trigger}
       >
-        <td className="w-7 pl-1">
+        <td className="pl-1">
           <EyeButton
             hidden={allHidden}
             onToggle={onToggleHidden}
             label={allHidden ? 'Show all in group' : 'Hide all in group'}
           />
         </td>
-        <td className="w-5">
+        <td>
           {expandable && (
             <button
               type="button"
@@ -212,14 +225,15 @@ function GroupRow({
             </button>
           )}
         </td>
-        <td className={cx(NUM, 'w-8 text-ink-dim')}>{row.quantity}</td>
-        <td className={cx(TXT, 'font-medium text-ink')}>
+        <td className={cx(NUM, 'text-ink-dim')}>{row.quantity}</td>
+        <td className={cx(TXT, 'overflow-hidden font-medium text-ink')}>
           <PartNames names={row.parts} />
         </td>
-        <td className={NUM}>{fmt(row.length)}</td>
-        <td className={NUM}>{fmt(row.width)}</td>
+        <td className={cx(NUM, 'whitespace-nowrap')}>
+          {fmt(row.length)} × {fmt(row.width)}
+        </td>
         <td className={NUM}>{fmt(row.thickness)}</td>
-        <td className={cx(TXT, 'whitespace-nowrap')}>
+        <td className={cx(TXT, 'overflow-hidden')}>
           <span className="flex items-center gap-1.5">
             <Swatch color={row.color} />
             <span className="truncate text-ink-dim">{row.material}</span>
@@ -262,7 +276,7 @@ function ChildRow({
       )}
       onClick={onSelect}
     >
-      <td className="w-7 pl-1">
+      <td className="pl-1">
         <EyeButton
           hidden={panel.hidden === true}
           onToggle={onToggleHidden}
@@ -270,11 +284,11 @@ function ChildRow({
         />
       </td>
       {/* The rail runs down the chevron column, tying every child to its group. */}
-      <td className="w-5">
+      <td>
         <span className="ml-[6px] block h-6 w-px bg-edge-strong" />
       </td>
-      <td className={cx(NUM, 'w-8 text-ink-faint')}>{index + 1}</td>
-      <td className={cx(TXT, 'text-ink-dim')} colSpan={4}>
+      <td className={cx(NUM, 'text-ink-faint')}>{index + 1}</td>
+      <td className={cx(TXT, 'overflow-hidden text-ink-dim')} colSpan={3}>
         {name}
       </td>
       <td />
