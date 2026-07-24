@@ -140,14 +140,26 @@ export function snapGroupDelta(
         if (min < nMax && max > nMin) {
           at(nMin - min, nMin, 'butt') // align low edges
           at(nMax - max, nMax, 'butt') // align high edges
-          // Only co-centre against a neighbour whose *thickness* runs along this
-          // axis (its face is perpendicular to the drag): that centre is a real
-          // mid-thickness reference. Skip panels that merely span the axis — the
-          // centre of a shelf's width isn't something to snap to.
-          if (axis === n.thinAxis) at(nCentre - centre, nCentre, 'middle')
         } else {
           at(nMax - min, nMax, 'butt') // our min butts their max
           at(nMin - max, nMin, 'butt') // our max butts their min
+        }
+
+        // The neighbour's centre line, offered as a peer of its faces exactly
+        // like `snapResizeFace` does — either of our faces may land on it, and
+        // so may our centre (co-centring two parallel panels). Landing a *face*
+        // there is the dado/rabbet reference: a shelf dropped onto the
+        // mid-thickness of a side. Offered whether or not we already overlap,
+        // since a dado is usually approached from outside.
+        //
+        // Only against a neighbour whose *thickness* runs along this axis (its
+        // face is perpendicular to the drag): that centre is a real
+        // mid-thickness reference. Skip panels that merely span the axis — the
+        // centre of a shelf's width isn't something to snap to.
+        if (axis === n.thinAxis) {
+          at(nCentre - centre, nCentre, 'middle') // co-centre
+          at(nCentre - min, nCentre, 'middle') // our low face onto their centre
+          at(nCentre - max, nCentre, 'middle') // our high face onto their centre
         }
       }
     }
