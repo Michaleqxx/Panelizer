@@ -38,7 +38,7 @@ export function GrainThumb({
 
   return (
     <svg
-      className="grain-thumb"
+      className="cursor-pointer fill-ink-dim/70 outline-none hover:fill-ink"
       width={BOX_W}
       height={BOX_H}
       role="button"
@@ -54,7 +54,12 @@ export function GrainThumb({
       {...tipProps(title)}
     >
       <rect x={(BOX_W - w) / 2} y={(BOX_H - h) / 2} width={w} height={h} rx={1.5} />
-      <text x={BOX_W / 2} y={BOX_H / 2 + 3.5} textAnchor="middle" className="grain-thumb__glyph">
+      <text
+        x={BOX_W / 2}
+        y={BOX_H / 2 + 3.5}
+        textAnchor="middle"
+        className="fill-bg text-[11px] font-bold"
+      >
         {glyph}
       </text>
     </svg>

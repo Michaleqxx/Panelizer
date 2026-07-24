@@ -4,6 +4,8 @@ import { formatMeasurement, type Unit } from '../../../lib/units'
 import { useDesignStore } from '../../../store/designStore'
 import { SheetSvg } from './SheetSvg'
 import type { MissingStock } from './useCutlistModel'
+import { Button } from '../../ui/Button'
+import { Hint, Swatch } from '../../ui/Panel'
 
 /** Longest sheet drawn this wide (px); everything else scales to match. On
  *  paper the sheets go wider so every part's label + size stays legible. */
@@ -43,9 +45,9 @@ export function CutResult({
   const noSpace = result.unplaced.filter((u) => u.reason === 'no-space')
 
   return (
-    <main className="cutlist-view__result">
+    <main className="min-w-0 flex-1 overflow-y-auto p-4">
       {result.groups.length === 0 && result.unplaced.length === 0 && (
-        <p className="cutlist-view__hint">Add sheet goods on the left to lay out the cut.</p>
+        <Hint>Add sheet goods on the left to lay out the cut.</Hint>
       )}
 
       {result.groups.map((group) => {
@@ -59,14 +61,14 @@ export function CutResult({
         const scale = (printing ? PRINT_SHEET_MAX_PX : SHEET_MAX_PX) / maxLength
 
         return (
-          <section className="cut-group" key={group.key}>
-            <h3>
-              <span className="parts__swatch" style={{ background: group.color }} /> {group.materialName} · {fmt(group.thickness)}
-              <span className="cut-group__stats">
+          <section data-cut-group className="mb-6" key={group.key}>
+            <h3 className="mt-0 mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
+              <Swatch color={group.color} /> {group.materialName} · {fmt(group.thickness)}
+              <span className="ml-2 text-xs font-normal text-ink-dim">
                 {group.sheets.length} sheet{group.sheets.length === 1 ? '' : 's'} · {waste}% waste
               </span>
             </h3>
-            <div className="cut-group__sheets">
+            <div className="flex flex-wrap gap-4">
               {group.sheets.map((sheet) => (
                 <SheetSvg
                   key={sheet.index}
@@ -90,9 +92,9 @@ export function CutResult({
       <MissingStockNotice missing={missing} unit={unit} />
 
       {tooBig.length > 0 && (
-        <section className="cut-group cut-group--unplaced">
-          <h3>Too big for the sheet</h3>
-          <ul>
+        <section className="mb-6 rounded border border-danger/40 bg-danger/10 p-3">
+          <h3 className="mt-0 mb-1 text-sm font-semibold text-danger">Too big for the sheet</h3>
+          <ul className="m-0 list-disc pl-5 text-sm text-ink-dim">
             {tooBig.map((u) => (
               <li key={u.panelId}>
                 {u.name} — larger than the {u.materialName} · {fmt(u.thickness)} sheet (minus margin)
@@ -103,12 +105,12 @@ export function CutResult({
       )}
 
       {noSpace.length > 0 && (
-        <section className="cut-group cut-group--unplaced">
-          <h3>Not enough stock</h3>
-          <p className="cutlist-view__hint">
+        <section className="mb-6 rounded border border-danger/40 bg-danger/10 p-3">
+          <h3 className="mt-0 mb-1 text-sm font-semibold text-danger">Not enough stock</h3>
+          <Hint>
             These parts fit, but the available sheet quantity ran out — raise a quantity or add more sheets:
-          </p>
-          <ul>
+          </Hint>
+          <ul className="m-0 list-disc pl-5 text-sm text-ink-dim">
             {noSpace.map((u) => (
               <li key={u.panelId}>
                 {u.name} — {u.materialName} · {fmt(u.thickness)}
@@ -120,8 +122,8 @@ export function CutResult({
 
       {/* Print-only parts table: every part to cut, with its dimensions, so the
           printout carries the full list next to the diagrams. */}
-      <section className="cutlist-print-list">
-        <h3>Parts</h3>
+      <section data-print-list className="hidden print:block">
+        <h3 className="mt-0 mb-1 text-sm font-semibold">Parts</h3>
         <table>
           <thead>
             <tr>
@@ -161,16 +163,16 @@ function MissingStockNotice({ missing, unit }: { missing: MissingStock[]; unit: 
   if (missing.length === 0) return null
 
   return (
-    <section className="cut-group cut-group--missing">
-      <h3>Missing stock</h3>
-      <p className="cutlist-view__hint">These parts have no sheet to nest onto. Add the matching stock:</p>
+    <section className="mb-6 rounded border border-snap-middle/40 bg-snap-middle/10 p-3">
+      <h3 className="mt-0 mb-1 text-sm font-semibold text-snap-middle">Missing stock</h3>
+      <Hint>These parts have no sheet to nest onto. Add the matching stock:</Hint>
       {missing.map((m) => (
-        <div className="missing-row" key={`${m.materialId}@${m.thickness}`}>
+        <div className="flex items-center justify-between gap-2 py-1 text-sm" key={`${m.materialId}@${m.thickness}`}>
           <span>
-            <span className="parts__swatch" style={{ background: materials.find((x) => x.id === m.materialId)?.color }} />{' '}
+            <Swatch color={materials.find((x) => x.id === m.materialId)?.color} />{' '}
             {m.materialName} · {formatMeasurement(m.thickness, unit)} — {m.count} part{m.count === 1 ? '' : 's'}
           </span>
-          <button onClick={() => addStock(m.materialId, m.thickness)}>+ Add sheet</button>
+          <Button size="sm" onClick={() => addStock(m.materialId, m.thickness)}>+ Add sheet</Button>
         </div>
       ))}
     </section>

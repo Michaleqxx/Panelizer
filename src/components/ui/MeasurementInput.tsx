@@ -7,6 +7,7 @@ import {
   UNIT_SUFFIX,
   type Unit,
 } from '../../lib/units'
+import { CONTROL, Field } from './Field'
 
 interface MeasurementInputProps {
   label: string
@@ -57,30 +58,27 @@ export function MeasurementInput({ label, value, onChange, unit, precision, min,
   }
 
   return (
-    <label className="field">
-      <span className="field__label">{label}</span>
-      <span className="field__control">
-        <input
-          type="text"
-          inputMode="decimal"
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value)
-            setDirty(true)
-          }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => {
-            setFocused(false)
-            if (dirty) commit()
-            else setText(formatMeasurement(value, unit))
-            setDirty(false)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur()
-          }}
-        />
-        <span className="field__suffix">{UNIT_SUFFIX[unit]}</span>
-      </span>
-    </label>
+    <Field label={label} suffix={UNIT_SUFFIX[unit]}>
+      <input
+        type="text"
+        inputMode="decimal"
+        className={CONTROL}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          setDirty(true)
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false)
+          if (dirty) commit()
+          else setText(formatMeasurement(value, unit))
+          setDirty(false)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+        }}
+      />
+    </Field>
   )
 }

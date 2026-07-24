@@ -163,7 +163,7 @@ export function ToolOverlay() {
             // Cap below the cutlist overlay (z-index 50) so it can't float over it.
             zIndexRange={[40, 0]}
           >
-            <span className="measure-label">
+            <span className="rounded border border-accent bg-surface px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap text-ink tabular-nums">
               {formatMeasurement(distance(measurement.a, measurement.b), unit)}
             </span>
           </Html>

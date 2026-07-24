@@ -40,10 +40,10 @@ export default function App() {
   }, [undo, redo])
 
   return (
-    <div className="app">
+    <div className="flex h-full flex-col">
       <Toolbar />
-      <main className="workspace">
-        <div className="workspace__viewport">
+      <main className="flex min-h-0 flex-1 print:hidden">
+        <div className="relative min-w-0 flex-1">
           <Viewport />
           <ViewportControls />
           <GestureReadout />

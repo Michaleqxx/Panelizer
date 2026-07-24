@@ -38,14 +38,15 @@ export function GestureReadout() {
   }
 
   return (
-    <div className="gesture-readout">
-      <span className="gesture-readout__label">
+    <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded border border-edge bg-surface/95 px-2.5 py-1.5 shadow-lg shadow-black/40">
+      <span className="text-xs tracking-wide text-ink-dim uppercase">
         {gesture.kind === 'move' ? 'Move' : 'Resize'} {gesture.label}
       </span>
       {gesture.editable ? (
         <input
           ref={inputRef}
           type="text"
+          className="w-24 rounded border border-accent bg-bg px-1.5 py-0.5 text-right font-mono text-ink focus:outline-none"
           defaultValue={formatMeasurement(gesture.delta, unit)}
           onChange={(e) => {
             // Arithmetic works here too; a relative op (`+3`) applies to the
@@ -65,9 +66,11 @@ export function GestureReadout() {
           onBlur={commit}
         />
       ) : (
-        <span className="gesture-readout__value">{formatMeasurement(gesture.delta, unit)}</span>
+        <span className="min-w-16 text-right font-mono text-ink tabular-nums">
+          {formatMeasurement(gesture.delta, unit)}
+        </span>
       )}
-      <span className="gesture-readout__unit">{UNIT_SUFFIX[unit]}</span>
+      <span className="text-xs text-ink-dim">{UNIT_SUFFIX[unit]}</span>
     </div>
   )
 }

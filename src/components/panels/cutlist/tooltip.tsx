@@ -31,7 +31,10 @@ export function useCursorTooltip() {
   })
 
   const node = tip ? (
-    <div className="tooltip" style={{ left: tip.x, top: tip.y }}>
+    <div
+      className="pointer-events-none fixed z-[100] translate-x-3 translate-y-3 rounded border border-edge bg-surface px-1.5 py-1 text-xs whitespace-nowrap text-ink shadow-lg shadow-black/40"
+      style={{ left: tip.x, top: tip.y }}
+    >
       {tip.text}
     </div>
   ) : null

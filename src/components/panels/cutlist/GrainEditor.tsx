@@ -3,6 +3,8 @@ import { formatMeasurement, type Unit } from '../../../lib/units'
 import { useDesignStore } from '../../../store/designStore'
 import { GrainThumb } from './GrainThumb'
 import { nextGrain } from './grainCycle'
+import { Section, Swatch } from '../../ui/Panel'
+import { cx } from '../../ui/cx'
 import type { GrainGroup } from './useCutlistModel'
 
 /**
@@ -45,14 +47,13 @@ export function GrainEditor({
   }
 
   return (
-    <div className="field-group">
-      <h3>Grain</h3>
+    <Section title="Grain">
       {groups.map((group) => (
-        <div className="grain-group" key={`${group.material}@${group.thickness}`}>
-          <div className="grain-group__head">
-            <span className="parts__swatch" style={{ background: group.color }} /> {group.material} · {fmt(group.thickness)}
+        <div className="mb-2" key={`${group.material}@${group.thickness}`}>
+          <div className="mb-0.5 flex items-center gap-1.5 text-xs text-ink-dim">
+            <Swatch color={group.color} /> {group.material} · {fmt(group.thickness)}
           </div>
-          <table className="parts__table grain-group__table">
+          <table className="w-full border-collapse text-xs">
             <tbody>
               {group.rows.map((row, i) => {
                 const note = unplacedNote(row.ids)
@@ -64,14 +65,17 @@ export function GrainEditor({
                 return (
                   <tr
                     key={i}
-                    className={`${isHovered(row.ids) ? 'is-hover' : ''}${included ? '' : ' is-excluded'}`}
+                    className={cx(
+                      isHovered(row.ids) && 'bg-accent/15',
+                      !included && 'opacity-45 line-through',
+                    )}
                     onMouseEnter={() => onHover(row.ids)}
                     onMouseLeave={() => onHover(null)}
                   >
-                    <td>
+                    <td className="w-5">
                       <input
                         type="checkbox"
-                        className="grain-include"
+                        className="cursor-pointer accent-accent"
                         checked={included}
                         onChange={() => toggleIncluded(row.ids)}
                         aria-label={included ? 'Exclude from cutlist (already cut)' : 'Include in cutlist'}
@@ -80,19 +84,19 @@ export function GrainEditor({
                         )}
                       />
                     </td>
-                    <td className="parts__name">
+                    <td className="py-1 text-ink">
                       {partNames(row.parts)}
                       {note && (
-                        <span className="grain-warn" {...tipProps(note)}>
+                        <span className="ml-1 cursor-help text-snap-middle" {...tipProps(note)}>
                           ⚠
                         </span>
                       )}
                     </td>
-                    <td>{row.quantity}×</td>
-                    <td>
+                    <td className="py-1 text-ink-dim">{row.quantity}×</td>
+                    <td className="py-1 text-ink-dim tabular-nums">
                       {fmt(row.length)} × {fmt(row.width)}
                     </td>
-                    <td>
+                    <td className="w-11">
                       <GrainThumb
                         length={panel?.length ?? row.length}
                         width={panel?.width ?? row.width}
@@ -108,6 +112,6 @@ export function GrainEditor({
           </table>
         </div>
       ))}
-    </div>
+    </Section>
   )
 }

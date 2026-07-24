@@ -1,0 +1,140 @@
+@import 'tailwindcss';
+
+/**
+ * Design tokens for the app, exposed to Tailwind as utilities.
+ *
+ * `@theme` entries become utility classes: `--color-surface` gives you
+ * `bg-surface`, `text-surface`, `border-surface`, and so on. The palette is the
+ * dark, dense look a shop tool wants — a near-black canvas so the 3D viewport
+ * and the cut diagrams carry the colour.
+ */
+@theme {
+  --color-bg: #14161a;
+  --color-surface: #1e2127;
+  --color-surface-2: #262a31;
+  --color-surface-3: #30353e;
+  --color-edge: #333842;
+  --color-edge-strong: #454b56;
+  --color-ink: #e6e8ec;
+  --color-ink-dim: #9aa0ab;
+  --color-accent: #2a6cff;
+  --color-accent-hover: #3f7cff;
+  --color-danger: #d6533f;
+
+  /* Snap-guide + overlay hues, shared with the 3D viewport so the readout and
+     the guides agree. */
+  --color-snap-butt: #2a6cff;
+  --color-snap-middle: #ffb02e;
+  --color-resize: #ff8a2a;
+  --color-overlap: #1fd1c4;
+
+  --radius-DEFAULT: 6px;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--color-ink);
+  }
+
+  html,
+  body,
+  #root {
+    margin: 0;
+    height: 100%;
+  }
+
+  body {
+    background: var(--color-bg);
+  }
+}
+
+/**
+ * Print rules.
+ *
+ * Printing turns the dark UI into ink on paper: the app chrome is dropped
+ * (via `print:hidden` on the components themselves), and the cut diagrams go
+ * monochrome so a shop printer doesn't waste toner flooding parts with colour.
+ *
+ * These hang off `data-*` hooks rather than utilities because they have to win
+ * against the on-screen styles and reach inside SVG. The attributes are set on
+ * the components they describe — search the data name to find them.
+ */
+@media print {
+  * {
+    /* No shadows on paper (kills the stray drop-shadow under the modal). */
+    box-shadow: none !important;
+  }
+
+  [data-print-root] {
+    background: #fff;
+    color: #000;
+  }
+
+  [data-print-root] h2,
+  [data-print-root] h3,
+  [data-print-root] th,
+  [data-print-root] td,
+  [data-print-root] li,
+  [data-print-root] span,
+  [data-print-root] figcaption {
+    color: #000 !important;
+  }
+
+  /* Monochrome diagrams: white parts, black outlines, no fills. */
+  [data-sheet-bg] {
+    fill: #fff !important;
+    stroke: #000 !important;
+  }
+  [data-sheet-margin] {
+    stroke: #999 !important;
+  }
+  [data-sheet-part] {
+    fill: #fff !important;
+    fill-opacity: 1 !important;
+    stroke: #000 !important;
+    stroke-width: 1 !important;
+  }
+
+  /* Chips lose their dark pill; swatches become an outline. */
+  [data-chip] {
+    background: transparent !important;
+    color: #000 !important;
+  }
+  [data-swatch] {
+    background: transparent !important;
+    border: 1px solid #000 !important;
+  }
+
+  /* Keep an individual sheet whole, but let a group flow across pages so a tall
+     group doesn't get shoved to page 2 and leave page 1 blank. */
+  [data-cut-group] {
+    break-inside: auto;
+  }
+  [data-sheet] {
+    break-inside: avoid;
+  }
+
+  [data-print-list] {
+    margin-top: 20px;
+    break-before: page;
+  }
+  [data-print-list] table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  [data-print-list] th,
+  [data-print-list] td {
+    border: 1px solid #999;
+    padding: 5px 8px;
+    text-align: left;
+  }
+  [data-print-list] th {
+    background: #eee;
+  }
+}

@@ -37,7 +37,12 @@ export function ResizableSidebar({ children }: { children: ReactNode }) {
 
   if (collapsed) {
     return (
-      <button className="sidebar-reopen" onClick={() => setCollapsed(false)} aria-label="Show panel">
+      <button
+        type="button"
+        className="cursor-pointer self-start border-y border-l border-edge bg-surface px-1 py-3 text-ink-dim hover:text-ink"
+        onClick={() => setCollapsed(false)}
+        aria-label="Show panel"
+      >
         ‹
       </button>
     )
@@ -46,14 +51,19 @@ export function ResizableSidebar({ children }: { children: ReactNode }) {
   return (
     <>
       <div
-        className="sidebar-resizer"
+        className="w-1 shrink-0 cursor-col-resize bg-edge transition-colors hover:bg-accent"
         role="separator"
         aria-orientation="vertical"
         onMouseDown={startResize}
       />
-      <aside className="workspace__sidebar" style={{ width }}>
-        <div className="sidebar__topbar">
-          <button className="sidebar__collapse" onClick={() => setCollapsed(true)} aria-label="Hide panel">
+      <aside className="flex shrink-0 flex-col overflow-y-auto bg-surface" style={{ width }}>
+        <div className="flex justify-start border-b border-edge px-1 py-0.5">
+          <button
+            type="button"
+            className="cursor-pointer border-0 bg-transparent px-1 text-ink-dim hover:text-ink"
+            onClick={() => setCollapsed(true)}
+            aria-label="Hide panel"
+          >
             ›
           </button>
         </div>

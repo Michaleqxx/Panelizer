@@ -51,7 +51,10 @@ export function SnapHints() {
             <Line points={points} color={color} lineWidth={2} transparent opacity={0.9} depthTest={false} />
             {hint.label !== false && (
               <Html position={labelAt} center zIndexRange={[40, 0]}>
-                <span className="snap-label" style={{ background: color }}>
+                <span
+                  className="rounded-xs px-1 py-px text-[10px] font-semibold whitespace-nowrap text-white"
+                  style={{ background: color }}
+                >
                   {label}
                 </span>
               </Html>

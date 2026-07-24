@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useDesignStore } from '../../store/designStore'
+import { Button } from '../ui/Button'
 import { useDragResize } from '../../hooks/useDragResize'
 import { usePersistentState } from '../../hooks/usePersistentState'
 import { CutResult } from './cutlist/CutResult'
@@ -58,20 +59,29 @@ export function CutlistModal() {
   if (!open) return null
 
   return (
-    <div className="cutlist-overlay" onClick={() => setOpen(false)}>
-      <div className="cutlist-view" onClick={(e) => e.stopPropagation()}>
-        <header className="cutlist-view__header">
-          <h2>Cutlist</h2>
-          <button className="cutlist-view__print" onClick={() => window.print()}>
-            Print
-          </button>
-          <button className="cutlist-view__close" aria-label="Close" onClick={() => setOpen(false)}>
+    <div
+      data-print-root
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 print:static print:block print:bg-white print:p-0"
+      onClick={() => setOpen(false)}
+    >
+      <div
+        className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-edge bg-bg shadow-2xl print:h-auto print:border-0 print:shadow-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex shrink-0 items-center gap-2 border-b border-edge bg-surface px-4 py-2.5 print:hidden">
+          <h2 className="m-0 flex-1 text-base font-semibold">Cutlist</h2>
+          <Button onClick={() => window.print()}>Print</Button>
+          <Button variant="ghost" icon aria-label="Close" onClick={() => setOpen(false)}>
             ✕
-          </button>
+          </Button>
         </header>
 
-        <div className="cutlist-view__body">
-          <aside className="cutlist-view__controls" ref={asideRef} style={{ width: controlsWidth }}>
+        <div className="flex min-h-0 flex-1 print:block">
+          <aside
+            className="flex shrink-0 flex-col overflow-y-auto bg-surface print:hidden"
+            ref={asideRef}
+            style={{ width: controlsWidth }}
+          >
             <StockList unit={unit} precision={precision} />
             <GrainEditor
               groups={model.grainGroups}
@@ -84,7 +94,7 @@ export function CutlistModal() {
           </aside>
 
           <div
-            className="cutlist-resizer"
+            className="w-1 shrink-0 cursor-col-resize bg-edge transition-colors hover:bg-accent print:hidden"
             role="separator"
             aria-orientation="vertical"
             onMouseDown={startResize}

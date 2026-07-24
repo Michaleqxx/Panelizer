@@ -3,6 +3,9 @@ import type { Stock } from '../../../lib/stock'
 import { formatMeasurement, type Unit } from '../../../lib/units'
 import { useDesignStore } from '../../../store/designStore'
 import { MeasurementInput } from '../../ui/MeasurementInput'
+import { Button } from '../../ui/Button'
+import { CONTROL, Field } from '../../ui/Field'
+import { Hint, Section, Swatch } from '../../ui/Panel'
 import { CheckIcon, PencilIcon } from './icons'
 
 /**
@@ -31,22 +34,21 @@ export function StockList({ unit, precision }: { unit: Unit; precision: number }
 
   return (
     <>
-      <div className="field-group">
-        <h3>Settings</h3>
+      <Section title="Settings">
         <MeasurementInput label="Kerf" value={kerf} unit={unit} precision={precision} min={0} snap onChange={setKerf} />
         <MeasurementInput label="Margin" value={margin} unit={unit} precision={precision} min={0} snap onChange={setMargin} />
-      </div>
+      </Section>
 
-      <div className="field-group">
-        <div className="sidebar__header">
-          <h3>Sheet goods</h3>
-          <button onClick={addAndEdit}>+ Add</button>
-        </div>
-
+      <Section
+        title="Sheet goods"
+        action={
+          <Button size="sm" onClick={addAndEdit}>
+            + Add
+          </Button>
+        }
+      >
         {stocks.length === 0 && (
-          <p className="cutlist-view__hint">
-            Add the sheets you have — parts nest onto stock of the same material and thickness.
-          </p>
+          <Hint>Add the sheets you have — parts nest onto stock of the same material and thickness.</Hint>
         )}
 
         {stocks.map((stock) =>
@@ -70,7 +72,7 @@ export function StockList({ unit, precision }: { unit: Unit; precision: number }
             />
           ),
         )}
-      </div>
+      </Section>
     </>
   )
 }
@@ -93,45 +95,45 @@ function StockEditor({
   const materials = useDesignStore((s) => s.materials)
 
   return (
-    <div className="stock stock--editing">
-      <div className="stock__row">
-        <select value={stock.materialId} onChange={(e) => onChange({ materialId: e.target.value })}>
-          {materials.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
+    <div className="mb-1.5 rounded border border-edge bg-surface-2 p-2">
+      <select
+        className={CONTROL}
+        value={stock.materialId}
+        onChange={(e) => onChange({ materialId: e.target.value })}
+      >
+        {materials.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.name}
+          </option>
+        ))}
+      </select>
 
-      <div className="stock__grid">
+      <div className="mt-1 grid grid-cols-2 gap-x-2">
         <MeasurementInput label="Thickness" value={stock.thickness} unit={unit} precision={precision} min={1} snap onChange={(v) => onChange({ thickness: v })} />
-        <label className="field">
-          <span className="field__label">Quantity</span>
-          <span className="field__control">
-            <input
-              type="number"
-              min={1}
-              placeholder="∞"
-              value={stock.quantity ?? ''}
-              onChange={(e) => {
-                const n = parseInt(e.target.value, 10)
-                onChange({ quantity: Number.isFinite(n) && n > 0 ? n : null })
-              }}
-            />
-          </span>
-        </label>
+        <Field label="Quantity">
+          <input
+            type="number"
+            min={1}
+            placeholder="∞"
+            className={CONTROL}
+            value={stock.quantity ?? ''}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10)
+              onChange({ quantity: Number.isFinite(n) && n > 0 ? n : null })
+            }}
+          />
+        </Field>
         <MeasurementInput label="Length" value={stock.length} unit={unit} precision={precision} min={1} snap onChange={(v) => onChange({ length: v })} />
         <MeasurementInput label="Width" value={stock.width} unit={unit} precision={precision} min={1} snap onChange={(v) => onChange({ width: v })} />
       </div>
 
-      <div className="stock__actions">
-        <button className="material__remove" aria-label="Remove stock" onClick={onRemove}>
+      <div className="mt-1.5 flex justify-end gap-1">
+        <Button variant="danger" icon aria-label="Remove stock" onClick={onRemove}>
           ✕
-        </button>
-        <button className="stock__done" aria-label="Done editing" onClick={onDone}>
+        </Button>
+        <Button variant="primary" icon aria-label="Done editing" onClick={onDone}>
           <CheckIcon />
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -152,20 +154,20 @@ function StockSummary({
   const fmt = (mm: number) => formatMeasurement(mm, unit)
 
   return (
-    <div className="stock stock__summary">
-      <span className="parts__swatch" style={{ background: material?.color }} />
-      <span className="stock__name">
+    <div className="flex items-center gap-1.5 py-1 text-xs">
+      <Swatch color={material?.color} />
+      <span className="shrink-0 text-ink">
         {material?.name} · {fmt(stock.thickness)}
       </span>
-      <span className="stock__dims">
+      <span className="flex-1 truncate text-ink-dim">
         {fmt(stock.length)} × {fmt(stock.width)} · {stock.quantity ? `${stock.quantity}×` : '∞'}
       </span>
-      <button className="stock__edit" aria-label="Edit stock" onClick={onEdit}>
+      <Button variant="ghost" icon aria-label="Edit stock" onClick={onEdit}>
         <PencilIcon />
-      </button>
-      <button className="material__remove" aria-label="Remove stock" onClick={onRemove}>
+      </Button>
+      <Button variant="danger" icon aria-label="Remove stock" onClick={onRemove}>
         ✕
-      </button>
+      </Button>
     </div>
   )
 }

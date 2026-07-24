@@ -19,5 +19,9 @@ export function ToolHint() {
     }
   })()
 
-  return <div className="tool-hint">{text}</div>
+  return (
+    <div className="shrink-0 border-b border-edge bg-accent/10 px-3 py-1.5 text-xs text-accent print:hidden">
+      {text}
+    </div>
+  )
 }

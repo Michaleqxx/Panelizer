@@ -1,6 +1,7 @@
 import type { Placement, SheetLayout } from '../../../lib/nesting'
 import { formatMeasurement, type Unit } from '../../../lib/units'
 import { planPlacements, type PlacementPlan } from './sheetPlan'
+import { cx } from '../../ui/cx'
 
 /** Geometry of one placed part in screen px, shared by both label renderers. */
 interface PartBox {
@@ -44,15 +45,17 @@ export function SheetSvg({
   const { plan, legend } = planPlacements(sheet.placements, scale, label, printing)
 
   return (
-    <figure className="sheet">
-      <svg width={W} height={H} className="sheet__svg" role="img">
-        <rect x={0} y={0} width={W} height={H} className="sheet__bg" />
+    <figure data-sheet className="m-0">
+      <svg width={W} height={H} className="block rounded-xs" role="img">
+        <rect x={0} y={0} width={W} height={H} data-sheet-bg
+          className="fill-surface-2 stroke-edge" />
         <rect
           x={margin * scale}
           y={margin * scale}
           width={W - 2 * margin * scale}
           height={H - 2 * margin * scale}
-          className="sheet__margin"
+          data-sheet-margin
+          className="fill-none stroke-edge [stroke-dasharray:4_3]"
         />
         {sheet.placements.map((p, i) => {
           const box: PartBox = { x: p.x * scale, y: p.y * scale, w: p.w * scale, h: p.h * scale }
@@ -78,7 +81,13 @@ export function SheetSvg({
                 width={box.w}
                 height={box.h}
                 fill={color}
-                className={isHot ? 'sheet__part sheet__part--hover' : 'sheet__part'}
+                data-sheet-part
+                className={cx(
+                  'cursor-default',
+                  isHot
+                    ? 'stroke-white [fill-opacity:1] [stroke-width:2.5]'
+                    : 'stroke-black/55 [fill-opacity:0.85] [stroke-width:1]',
+                )}
               />
               {printing ? (
                 <PrintLabel placement={p} box={box} plan={plan[i]} />
@@ -90,16 +99,18 @@ export function SheetSvg({
         })}
       </svg>
 
-      <figcaption>
+      <figcaption className="mt-1 text-xs text-ink-dim">
         Sheet {sheet.index} · {label(sheet.length)} × {label(sheet.width)}
-        <span className="sheet__grain-hint">↔ grain</span>
+        <span className="ml-2 rounded-full border border-accent/45 bg-accent/20 px-1.5 py-px text-[9px] whitespace-nowrap text-accent">
+          ↔ grain
+        </span>
       </figcaption>
 
       {printing && legend.length > 0 && (
-        <ul className="sheet__legend">
+        <ul className="mt-1 grid list-none grid-cols-2 gap-x-3 p-0 text-[9px] text-ink-dim">
           {legend.map((entry) => (
             <li key={entry.letter}>
-              <span className="sheet__legend-key">{entry.letter}</span> {entry.text}
+              <LegendKey>{entry.letter}</LegendKey> {entry.text}
             </li>
           ))}
         </ul>
@@ -108,12 +119,40 @@ export function SheetSvg({
   )
 }
 
+/** Legend key badge, shared by the sheet legend and the thin-strip labels. */
+function LegendKey({ children }: { children: React.ReactNode }) {
+  return (
+    <span data-chip className="inline-block min-w-3.5 rounded-xs bg-black/45 px-1 text-center font-bold text-white">
+      {children}
+    </span>
+  )
+}
+
+const LETTER_BADGE =
+  'flex h-full w-full items-center justify-center rounded-xs bg-black/45 text-[10px] font-bold text-white'
+
+const DIM_ROW = 'flex h-full w-full items-center justify-center'
+const DIM_CHIP =
+  'rounded-xs bg-black/45 px-1 text-[9px] font-semibold text-white tabular-nums whitespace-nowrap'
+
 /** A dimension chip, optionally rotated to run down a part's left edge. */
-function DimChip({ x, y, text, rotateAbout }: { x: number; y: number; text: string; rotateAbout?: [number, number] }) {
+function DimChip({
+  x,
+  y,
+  text,
+  height = 15,
+  rotateAbout,
+}: {
+  x: number
+  y: number
+  text: string
+  height?: number
+  rotateAbout?: [number, number]
+}) {
   const chip = (
-    <foreignObject x={x} y={y} width={80} height={15}>
-      <div className="sheet__dim">
-        <span className="sheet__dim-chip">{text}</span>
+    <foreignObject x={x} y={y} width={80} height={height}>
+      <div className={DIM_ROW}>
+        <span data-chip className={DIM_CHIP}>{text}</span>
       </div>
     </foreignObject>
   )
@@ -134,7 +173,7 @@ function PrintLabel({ placement, box, plan }: { placement: Placement; box: PartB
   if (mode === 'letter') {
     return (
       <foreignObject x={cx - 9} y={cy - 9} width={18} height={18}>
-        <div className="sheet__letter">{letter}</div>
+        <div data-chip className={LETTER_BADGE}>{letter}</div>
       </foreignObject>
     )
   }
@@ -146,10 +185,10 @@ function PrintLabel({ placement, box, plan }: { placement: Placement; box: PartB
     const bh = portrait ? box.w : box.h
     return (
       <g transform={portrait ? `rotate(-90 ${cx} ${cy})` : undefined}>
-        <foreignObject x={cx - bw / 2} y={cy - bh / 2} width={bw} height={bh} className="sheet__plabel-fo">
-          <div className="sheet__plabel sheet__plabel--row">
-            <span className="sheet__legend-key">{letter}</span>
-            <span className="sheet__plabel-size">{size}</span>
+        <foreignObject x={cx - bw / 2} y={cy - bh / 2} width={bw} height={bh} className="overflow-visible">
+          <div className="flex h-full w-full flex-row items-center justify-center gap-1 text-center leading-tight text-ink">
+            <LegendKey>{letter}</LegendKey>
+            <span className="text-[9px] tabular-nums">{size}</span>
           </div>
         </foreignObject>
       </g>
@@ -164,15 +203,16 @@ function PrintLabel({ placement, box, plan }: { placement: Placement; box: PartB
       <DimChip x={cx - 40} y={box.y + 2} text={wStr} />
       <DimChip x={box.x + 10 - 40} y={cy - 8} text={hStr} rotateAbout={[box.x + 10, cy]} />
       {named ? (
-        <foreignObject x={box.x + 16} y={box.y + 16} width={innerW} height={innerH} className="sheet__namebox">
-          <div className="sheet__plabel">
-            <span className="sheet__plabel-name">{placement.name}</span>
+        // Clipped so a long name can't spill onto the edge dims or a neighbour.
+        <foreignObject x={box.x + 16} y={box.y + 16} width={innerW} height={innerH} className="overflow-hidden">
+          <div className="flex h-full w-full flex-col items-center justify-center text-center leading-tight text-ink">
+            <span className="text-[10px] font-bold [overflow-wrap:anywhere]">{placement.name}</span>
           </div>
         </foreignObject>
       ) : (
         // Bottom-right corner — clear of the top/left edge dims.
         <foreignObject x={box.x + box.w - 16} y={box.y + box.h - 16} width={14} height={14}>
-          <div className="sheet__letter">{letter}</div>
+          <div data-chip className={LETTER_BADGE}>{letter}</div>
         </foreignObject>
       )}
     </>
@@ -194,27 +234,31 @@ function ScreenLabel({
   return (
     <>
       {box.w > 34 && box.h > 16 && (
-        <foreignObject x={box.x} y={box.y} width={box.w} height={box.h} className="sheet__label-fo">
-          <div className="sheet__label">
-            <span className="sheet__label-text">{placement.name}</span>
+        <foreignObject
+          x={box.x}
+          y={box.y}
+          width={box.w}
+          height={box.h}
+          className="pointer-events-none overflow-hidden"
+        >
+          <div className="flex h-full w-full items-center justify-center p-0.5">
+            <span className="max-w-full rounded-sm bg-black/35 px-1.5 py-px text-center text-[9px] leading-tight font-semibold text-white [overflow-wrap:anywhere]">
+              {placement.name}
+            </span>
           </div>
         </foreignObject>
       )}
       {isHot && (
         <>
           {/* Size on the sheet: width along the top, height down the left. */}
-          <foreignObject x={box.x + box.w / 2 - 40} y={box.y + 2} width={80} height={18}>
-            <div className="sheet__dim">
-              <span className="sheet__dim-chip">{label(placement.w)}</span>
-            </div>
-          </foreignObject>
-          <g transform={`rotate(-90 ${box.x + 11} ${box.y + box.h / 2})`}>
-            <foreignObject x={box.x + 11 - 40} y={box.y + box.h / 2 - 9} width={80} height={18}>
-              <div className="sheet__dim">
-                <span className="sheet__dim-chip">{label(placement.h)}</span>
-              </div>
-            </foreignObject>
-          </g>
+          <DimChip x={box.x + box.w / 2 - 40} y={box.y + 2} text={label(placement.w)} height={18} />
+          <DimChip
+            x={box.x + 11 - 40}
+            y={box.y + box.h / 2 - 9}
+            text={label(placement.h)}
+            height={18}
+            rotateAbout={[box.x + 11, box.y + box.h / 2]}
+          />
         </>
       )}
     </>

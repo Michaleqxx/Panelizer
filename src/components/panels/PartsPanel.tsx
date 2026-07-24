@@ -4,11 +4,16 @@ import { buildParts, partNames, partsToCsv } from '../../lib/parts'
 import { formatMeasurement, UNIT_SUFFIX, type Unit } from '../../lib/units'
 import { useDesignStore } from '../../store/designStore'
 import { useTooltip } from '../ui/useTooltip'
+import { Button } from '../ui/Button'
+import { Hint, Section, Swatch } from '../ui/Panel'
+import { cx } from '../ui/cx'
 
 type PartRow = ReturnType<typeof buildParts>[number]
 
 /** Stable identity for a group row, so expand state survives re-derivation. */
 const groupKey = (r: PartRow) => `${r.length}x${r.width}x${r.thickness}@${r.material}`
+
+const CELL = 'px-1 py-1 text-left'
 
 /** Live list of the project's parts, derived from the panels. Identical parts
  *  are grouped and counted; a group can be expanded to reach each panel on its
@@ -45,28 +50,28 @@ export function PartsPanel() {
   }
 
   return (
-    <section className="sidebar__section parts">
-      <div className="sidebar__header">
-        <h2>Parts</h2>
-        <button onClick={copyCsv} disabled={rows.length === 0}>
+    <Section
+      title="Parts"
+      action={
+        <Button size="sm" onClick={copyCsv} disabled={rows.length === 0}>
           Copy CSV
-        </button>
-      </div>
-
+        </Button>
+      }
+    >
       {rows.length === 0 ? (
-        <p className="parts__empty">No panels yet.</p>
+        <Hint>No panels yet.</Hint>
       ) : (
-        <table className="parts__table">
+        <table className="w-full border-collapse text-xs">
           <thead>
-            <tr>
-              <th className="parts__toggle-col" />
-              <th>Qty</th>
-              <th>Part</th>
-              <th>Length</th>
-              <th>Width</th>
-              <th>Thick.</th>
-              <th>Material</th>
-              <th className="parts__eye-col" />
+            <tr className="text-ink-dim">
+              <th className="w-4" />
+              <th className={CELL}>Qty</th>
+              <th className={CELL}>Part</th>
+              <th className={CELL}>Length</th>
+              <th className={CELL}>Width</th>
+              <th className={CELL}>Thick.</th>
+              <th className={CELL}>Material</th>
+              <th className="w-6" />
             </tr>
           </thead>
           <tbody>
@@ -108,11 +113,11 @@ export function PartsPanel() {
         </table>
       )}
 
-      <p className="parts__total">
+      <p className="mt-2 mb-0 text-xs text-ink-dim">
         {panels.length} panel{panels.length === 1 ? '' : 's'} · {rows.length} unique part
         {rows.length === 1 ? '' : 's'} · dimensions in {UNIT_SUFFIX[unit]}
       </p>
-    </section>
+    </Section>
   )
 }
 
@@ -147,11 +152,19 @@ function GroupRow({
 
   return (
     <>
-      <tr className={selected ? 'is-selected' : ''} onClick={onSelect} {...tip.trigger}>
-        <td className="parts__toggle-col">
+      <tr
+        className={cx('cursor-pointer hover:bg-surface-2', selected && 'bg-accent/15')}
+        onClick={onSelect}
+        {...tip.trigger}
+      >
+        <td className="w-4">
           {expandable && (
             <button
-              className={`parts__chevron ${open ? 'is-open' : ''}`}
+              type="button"
+              className={cx(
+                'cursor-pointer border-0 bg-transparent p-0 text-ink-dim transition-transform hover:text-ink',
+                open && 'rotate-90',
+              )}
               onClick={(e) => {
                 e.stopPropagation()
                 onToggleOpen()
@@ -162,16 +175,16 @@ function GroupRow({
             </button>
           )}
         </td>
-        <td>{row.quantity}</td>
-        <td className="parts__name">{partNames(row.parts)}</td>
-        <td>{fmt(row.length)}</td>
-        <td>{fmt(row.width)}</td>
-        <td>{fmt(row.thickness)}</td>
-        <td className="parts__material">
-          <span className="parts__swatch" style={{ background: row.color }} /> {row.material}
+        <td className={CELL}>{row.quantity}</td>
+        <td className={cx(CELL, 'text-ink')}>{partNames(row.parts)}</td>
+        <td className={CELL}>{fmt(row.length)}</td>
+        <td className={CELL}>{fmt(row.width)}</td>
+        <td className={CELL}>{fmt(row.thickness)}</td>
+        <td className={cx(CELL, 'whitespace-nowrap')}>
+          <Swatch color={row.color} /> {row.material}
           {tip.node}
         </td>
-        <td className="parts__eye-col">
+        <td className="w-6">
           <EyeButton
             hidden={allHidden}
             onToggle={onToggleHidden}
@@ -200,13 +213,20 @@ function ChildRow({
   onToggleHidden: () => void
 }) {
   return (
-    <tr className={`parts__child ${selected ? 'is-selected' : ''} ${panel.hidden ? 'is-hidden' : ''}`} onClick={onSelect}>
-      <td className="parts__toggle-col" />
+    <tr
+      className={cx(
+        'cursor-pointer text-ink-dim hover:bg-surface-2',
+        selected && 'bg-accent/15',
+        panel.hidden && 'opacity-50',
+      )}
+      onClick={onSelect}
+    >
+      <td className="w-4" />
       <td />
-      <td className="parts__name" colSpan={4}>
+      <td className={cx(CELL, 'pl-2')} colSpan={4}>
         {name}
       </td>
-      <td className="parts__eye-col">
+      <td className="w-6">
         <EyeButton
           hidden={panel.hidden === true}
           onToggle={onToggleHidden}
@@ -222,7 +242,11 @@ function ChildRow({
 function EyeButton({ hidden, onToggle, label }: { hidden: boolean; onToggle: () => void; label: string }) {
   return (
     <button
-      className={`parts__eye ${hidden ? 'is-off' : ''}`}
+      type="button"
+      className={cx(
+        'cursor-pointer border-0 bg-transparent p-0.5 hover:text-ink',
+        hidden ? 'text-ink-dim/50' : 'text-ink-dim',
+      )}
       onClick={(e) => {
         e.stopPropagation()
         onToggle()

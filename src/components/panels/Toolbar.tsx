@@ -4,7 +4,9 @@ import { useDesignStore, type Tool } from '../../store/designStore'
 import { downloadDesign, parse } from '../../lib/persistence'
 import { defaultThinThickness } from '../../lib/panel'
 import { DOCUMENT_UNITS, IMPERIAL_PRECISIONS, sameSystem, type Unit } from '../../lib/units'
-import { Menu } from '../ui/Menu'
+import { Menu, MenuChoices, MenuItem, MenuLabel, MenuList } from '../ui/Menu'
+import { Button } from '../ui/Button'
+import { cx } from '../ui/cx'
 import { ToolHint } from '../layout/ToolHint'
 
 /** Quick-add presets so a carcass can be roughed out in a few clicks. Each sets
@@ -31,6 +33,8 @@ const TOOL_SECTIONS: { label: string; tools: { tool: Tool; label: string }[] }[]
   { label: 'Resize', tools: [{ tool: 'resize', label: 'Resize' }] },
   { label: 'Measure', tools: [{ tool: 'measure', label: 'Measure' }] },
 ]
+
+const DIVIDER = <div className="my-1 border-t border-edge" />
 
 export function Toolbar() {
   const panels = useDesignStore((s) => s.panels)
@@ -84,182 +88,165 @@ export function Toolbar() {
 
   return (
     <>
-    <header className="toolbar">
-      <img src="/Panelizer/logo.png" alt="Panelizer" className="toolbar__logo" />
+      <header className="flex shrink-0 items-center gap-2 border-b border-edge bg-surface px-3 py-2 print:hidden">
+        <img src="/Panelizer/logo.png" alt="Panelizer" className="mr-1 h-6 w-auto" />
 
-      <Menu label="+ Add">
-        {(close) => (
-          <div className="menu__list">
-            {ADD_PRESETS.map(({ label, preset, thin }) => (
-              <button
-                key={label}
-                className="menu__item"
+        <Menu label="+ Add">
+          {(close) => (
+            <MenuList>
+              {ADD_PRESETS.map(({ label, preset, thin }) => (
+                <MenuItem
+                  key={label}
+                  onClick={() => {
+                    addPanel(thin ? { ...preset, thickness: defaultThinThickness(unit) } : preset)
+                    close()
+                  }}
+                >
+                  {label}
+                </MenuItem>
+              ))}
+            </MenuList>
+          )}
+        </Menu>
+
+        <div className="flex items-center gap-1" role="group" aria-label="Tools">
+          {TOOL_SECTIONS.map((section) => {
+            const active = section.tools.find((t) => t.tool === tool)
+
+            // Single-mode bucket: a plain toggle button.
+            if (section.tools.length === 1) {
+              const { tool: t, label } = section.tools[0]
+              return (
+                <Button
+                  key={section.label}
+                  variant={tool === t ? 'primary' : 'default'}
+                  onClick={() => setTool(t)}
+                >
+                  {label}
+                </Button>
+              )
+            }
+
+            // Multi-mode bucket: a dropdown showing the active sub-mode.
+            return (
+              <Menu
+                key={section.label}
+                ariaLabel={section.label}
+                label={
+                  <span className={cx('flex items-center gap-1.5', active && 'text-accent')}>
+                    {section.label}
+                    {active && (
+                      <span className="rounded-xs bg-accent/15 px-1 text-xs text-accent">
+                        {active.label}
+                      </span>
+                    )}
+                  </span>
+                }
+              >
+                {(close) => (
+                  <MenuList>
+                    {section.tools.map(({ tool: t, label }) => (
+                      <MenuItem
+                        key={t}
+                        onClick={() => {
+                          setTool(t)
+                          close()
+                        }}
+                      >
+                        <span className={cx(tool === t && 'text-accent')}>{label}</span>
+                      </MenuItem>
+                    ))}
+                  </MenuList>
+                )}
+              </Menu>
+            )
+          })}
+        </div>
+
+        <div className="flex-1" />
+
+        <Button disabled={empty} onClick={() => setCutlistOpen(true)}>
+          Cutlist
+        </Button>
+
+        <Menu label="☰" ariaLabel="Document menu" align="right">
+          {(close) => (
+            <MenuList>
+              <MenuLabel>Default document unit</MenuLabel>
+              <MenuChoices options={DOCUMENT_UNITS} value={unit} onChange={changeUnit} />
+
+              {DIVIDER}
+
+              <MenuItem
+                disabled={empty}
                 onClick={() => {
-                  addPanel(thin ? { ...preset, thickness: defaultThinThickness(unit) } : preset)
+                  downloadDesign({ panels, materials, stocks, unit, precision, kerf, margin })
                   close()
                 }}
               >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-      </Menu>
-
-      <div className="toolbar__group" role="group" aria-label="Tools">
-        {TOOL_SECTIONS.map((section) => {
-          const active = section.tools.find((t) => t.tool === tool)
-
-          // Single-mode bucket: a plain toggle button.
-          if (section.tools.length === 1) {
-            const { tool: t, label } = section.tools[0]
-            return (
-              <button
-                key={section.label}
-                className={tool === t ? 'is-active' : ''}
-                onClick={() => setTool(t)}
+                Export…
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  fileInput.current?.click()
+                  close()
+                }}
               >
-                {label}
-              </button>
-            )
-          }
+                Import…
+              </MenuItem>
 
-          // Multi-mode bucket: a dropdown showing the active sub-mode.
-          return (
-            <Menu
-              key={section.label}
-              ariaLabel={section.label}
-              label={
-                <span className={active ? 'toolbar__bucket is-active' : 'toolbar__bucket'}>
-                  {section.label}
-                  {active && <span className="toolbar__bucket-mode">{active.label}</span>}
-                </span>
-              }
-            >
-              {(close) => (
-                <div className="menu__list">
-                  {section.tools.map(({ tool: t, label }) => (
-                    <button
-                      key={t}
-                      className={tool === t ? 'menu__item is-active' : 'menu__item'}
-                      onClick={() => {
-                        setTool(t)
-                        close()
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+              {unit === 'inch' && (
+                <>
+                  <MenuLabel>Precision</MenuLabel>
+                  <MenuChoices
+                    options={IMPERIAL_PRECISIONS.map((p) => ({ value: p, label: `1/${p}` }))}
+                    value={precision}
+                    onChange={setPrecision}
+                  />
+                </>
               )}
-            </Menu>
-          )
-        })}
-      </div>
 
-      <div className="toolbar__spacer" />
+              {DIVIDER}
 
-      <button className="toolbar__cutlist" disabled={empty} onClick={() => setCutlistOpen(true)}>
-        Cutlist
-      </button>
+              <MenuItem
+                disabled={empty}
+                onClick={() => {
+                  fixPrecision()
+                  close()
+                }}
+              >
+                Fix precision
+              </MenuItem>
 
-      <Menu label="☰" ariaLabel="Document menu" align="right">
-        {(close) => (
-          <div className="menu__list">
-            <div className="menu__label">Default document unit</div>
-            <div className="menu__units">
-              {DOCUMENT_UNITS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  className={unit === value ? 'is-active' : ''}
-                  onClick={() => changeUnit(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+              {DIVIDER}
 
-            <div className="menu__divider" />
+              <MenuItem
+                danger
+                disabled={empty}
+                onClick={() => {
+                  if (!empty && confirm('Clear the whole design?')) clear()
+                  close()
+                }}
+              >
+                New (clear all)
+              </MenuItem>
+            </MenuList>
+          )}
+        </Menu>
 
-            <button
-              className="menu__item"
-              disabled={empty}
-              onClick={() => {
-                downloadDesign({ panels, materials, stocks, unit, precision, kerf, margin })
-                close()
-              }}
-            >
-              Export…
-            </button>
-            <button
-              className="menu__item"
-              onClick={() => {
-                fileInput.current?.click()
-                close()
-              }}
-            >
-              Import…
-            </button>
-
-            {unit === 'inch' && (
-              <>
-                <div className="menu__label">Precision</div>
-                <div className="menu__units">
-                  {IMPERIAL_PRECISIONS.map((p) => (
-                    <button
-                      key={p}
-                      className={precision === p ? 'is-active' : ''}
-                      onClick={() => setPrecision(p)}
-                    >
-                      1/{p}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <div className="menu__divider" />
-
-            <button
-              className="menu__item"
-              disabled={empty}
-              onClick={() => {
-                fixPrecision()
-                close()
-              }}
-            >
-              Fix precision
-            </button>
-
-            <div className="menu__divider" />
-
-            <button
-              className="menu__item menu__item--danger"
-              disabled={empty}
-              onClick={() => {
-                if (!empty && confirm('Clear the whole design?')) clear()
-                close()
-              }}
-            >
-              New (clear all)
-            </button>
-          </div>
-        )}
-      </Menu>
-
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".json,application/json"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) handleImport(file)
-          e.target.value = '' // allow re-importing the same filename
-        }}
-      />
-    </header>
-    <ToolHint />
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) handleImport(file)
+            e.target.value = '' // allow re-importing the same filename
+          }}
+        />
+      </header>
+      <ToolHint />
     </>
   )
 }
