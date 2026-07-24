@@ -1,5 +1,32 @@
 # Panelizer / Wood3D — Refactoring Plan
 
+## Progress
+
+| Phase | Scope | Status |
+|---|---|---|
+| 0 | Vitest + characterization tests | **done** — `530eb09` |
+| 1 | `lib/` bounds & constant dedup, `repairPrecision` split | **done** — `435a0a2` |
+| 2 | `units.ts` evaluator split | **done** — `e737ae5` |
+| 3 | `nesting.ts` packer restructure | **done** — `e737ae5` |
+| 4 | viewport dedup (hint builder, `toMetres`) | **done** — `f32d4ee` |
+| 4b | palette tokens | todo |
+| 5 | `useGesture` hook | todo (highest care) |
+| 6 | CutlistModal decomposition | todo |
+| 7 | shared UI primitives | todo |
+| 8 | *optional* Radix / resizable-panels | todo |
+
+Out of band: `a0e6a27` fixed middle-snapping for **move** (a pre-existing gap
+from `404fc06`, not a refactor regression) — move only ever offered
+centre-to-centre, so a face could never land on a neighbour's centre line the
+way resize already allowed.
+
+Suite is at 172 tests. Phases 1–3 were each additionally proven output-identical
+against the previous implementation with a throwaway differential fuzz harness
+(snapping: 6000 scenes; nesting: 2000 projects; units: 20000 expressions plus
+19203 exhaustive 1/64" format steps).
+
+
+
 Goal: sleeker, more readable code split into smaller distinctive functions, with
 **zero functionality loss and zero new bugs**. This is the overriding constraint.
 Every step below is behavior-preserving unless explicitly flagged **[BEHAVIOR

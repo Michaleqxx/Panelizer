@@ -1,4 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { useDragResize } from '../../hooks/useDragResize'
+import { usePersistentState } from '../../hooks/usePersistentState'
 
 const MIN_WIDTH = 260
 const MAX_WIDTH = 560
@@ -10,48 +12,28 @@ interface SidebarPrefs {
   collapsed: boolean
 }
 
-function loadPrefs(): SidebarPrefs {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { width: DEFAULT_WIDTH, collapsed: false, ...JSON.parse(raw) }
-  } catch {
-    // ignore malformed / unavailable storage
-  }
-  return { width: DEFAULT_WIDTH, collapsed: false }
-}
+const DEFAULTS: SidebarPrefs = { width: DEFAULT_WIDTH, collapsed: false }
 
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+/** Merge a stored entry over the defaults, so a preference added later still
+ *  loads an older, narrower entry. */
+const revivePrefs = (stored: unknown): SidebarPrefs => ({ ...DEFAULTS, ...(stored as object) })
 
 /** The right-hand panel: draggable to resize (handle on its left edge) and
  *  collapsible. Width and collapsed state are remembered as a UI preference,
  *  independent of the saved design. */
 export function ResizableSidebar({ children }: { children: ReactNode }) {
-  const [{ width, collapsed }, setPrefs] = useState(loadPrefs)
+  const [{ width, collapsed }, setPrefs] = usePersistentState(STORAGE_KEY, DEFAULTS, revivePrefs)
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ width, collapsed }))
-    } catch {
-      // best-effort
-    }
-  }, [width, collapsed])
-
-  const setWidth = (w: number) => setPrefs((p) => ({ ...p, width: w }))
   const setCollapsed = (c: boolean) => setPrefs((p) => ({ ...p, collapsed: c }))
 
-  const startResize = (e: React.MouseEvent) => {
-    e.preventDefault()
-    const onMove = (ev: MouseEvent) =>
-      setWidth(clamp(window.innerWidth - ev.clientX, MIN_WIDTH, MAX_WIDTH))
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      document.body.style.userSelect = ''
-    }
-    document.body.style.userSelect = 'none'
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }
+  // The sidebar is pinned to the window's right edge, so its width is however
+  // far the cursor sits from that edge — no reference point to capture.
+  const startResize = useDragResize({
+    min: MIN_WIDTH,
+    max: MAX_WIDTH,
+    begin: () => (move) => window.innerWidth - move.clientX,
+    onWidth: (w) => setPrefs((p) => ({ ...p, width: w })),
+  })
 
   if (collapsed) {
     return (
