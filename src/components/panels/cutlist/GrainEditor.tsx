@@ -80,10 +80,12 @@ export function GrainEditor({
                     onMouseEnter={() => onHover(row.ids)}
                     onMouseLeave={() => onHover(null)}
                   >
-                    <td className="w-7 pl-1.5">
+                    <td className="w-7 pl-1.5 align-middle">
                       <input
                         type="checkbox"
-                        className="size-3.5 cursor-pointer accent-accent"
+                        // `block` takes it out of the text baseline, which is
+                        // what left it sitting low in the row.
+                        className="block size-3.5 cursor-pointer accent-accent"
                         checked={included}
                         onChange={() => toggleIncluded(row.ids)}
                         aria-label={included ? 'Exclude from cutlist (already cut)' : 'Include in cutlist'}

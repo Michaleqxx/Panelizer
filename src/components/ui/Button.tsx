@@ -38,8 +38,8 @@ const VARIANTS: Record<Variant, string> = {
 }
 
 const SIZES: Record<Size, string> = {
-  sm: 'text-micro px-2 py-[3px]',
-  md: 'text-small px-2.5 py-1',
+  sm: 'text-micro px-2.5 py-1',
+  md: 'text-small px-3 py-1.5',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

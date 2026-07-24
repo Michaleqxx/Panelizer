@@ -7,6 +7,7 @@ import { DOCUMENT_UNITS, IMPERIAL_PRECISIONS, sameSystem, type Unit } from '../.
 import { Menu, MenuChoices, MenuItem, MenuLabel, MenuList } from '../ui/Menu'
 import { Button } from '../ui/Button'
 import { cx } from '../ui/cx'
+import { useConfirm } from '../ui/useConfirm'
 import { ToolHint } from '../layout/ToolHint'
 
 /** Quick-add presets so a carcass can be roughed out in a few clicks. Each sets
@@ -55,25 +56,25 @@ export function Toolbar() {
   const fixPrecision = useDesignStore((s) => s.fixPrecision)
   const clear = useDesignStore((s) => s.clear)
   const fileInput = useRef<HTMLInputElement>(null)
+  const confirm = useConfirm()
   const empty = panels.length === 0
 
   // Changing the document unit converts the geometry onto the new unit's grid.
   // Crossing measuring systems (mm↔inch) is lossy — every size snaps to the
   // nearest 1/16" and small gaps close — so confirm first.
-  const changeUnit = (next: Unit) => {
+  const changeUnit = async (next: Unit) => {
     if (next === unit) return
     if (empty) {
       setUnit(next)
       return
     }
-    if (
-      !sameSystem(next, unit) &&
-      !confirm(
-        `Switch to ${next === 'inch' ? 'inches' : next}? Every size snaps to the nearest ` +
-          `${next === 'inch' ? '1/16"' : 'mm'} and small joint gaps are closed. This is lossy and can't be undone cleanly.`,
-      )
-    ) {
-      return
+    if (!sameSystem(next, unit)) {
+      const ok = await confirm({
+        title: `Switch to ${next === 'inch' ? 'inches' : next}?`,
+        body: `Every size snaps to the nearest ${next === 'inch' ? '1/16"' : 'mm'} and small joint gaps are closed. This is lossy and can't be undone cleanly.`,
+        confirmLabel: 'Convert',
+      })
+      if (!ok) return
     }
     convertUnit(next)
   }
@@ -82,13 +83,17 @@ export function Toolbar() {
     try {
       loadDesign(parse(await file.text()))
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Could not read that file.')
+      await confirm({
+        title: 'Could not import that file',
+        body: error instanceof Error ? error.message : 'Could not read that file.',
+        confirmLabel: 'OK',
+      })
     }
   }
 
   return (
     <>
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-edge bg-surface px-3 print:hidden">
+      <header className="flex h-13 shrink-0 items-center gap-5 border-b border-edge bg-surface px-4 print:hidden">
         <img src="/Panelizer/logo.png" alt="Panelizer" className="h-5 w-auto opacity-90" />
 
         <Menu label="+ Add">
@@ -109,7 +114,7 @@ export function Toolbar() {
           )}
         </Menu>
 
-        <div className="flex items-center gap-1 rounded-md border border-edge bg-bg/60 p-1" role="group" aria-label="Tools">
+        <div className="flex items-center gap-2 rounded-md border border-edge bg-bg/60 p-1.5" role="group" aria-label="Tools">
           {TOOL_SECTIONS.map((section) => {
             const active = section.tools.find((t) => t.tool === tool)
 
@@ -174,7 +179,7 @@ export function Toolbar() {
 
         {/* The document menu is a different kind of thing to the Cutlist action,
             so it sits past a divider rather than crowding against it. */}
-        <span className="h-5 w-px bg-edge" />
+        <span className="h-6 w-px bg-edge" />
 
         <Menu label="☰" ariaLabel="Document menu" align="right" variant="ghost">
           {(close) => (
@@ -230,9 +235,17 @@ export function Toolbar() {
               <MenuItem
                 danger
                 disabled={empty}
-                onClick={() => {
-                  if (!empty && confirm('Clear the whole design?')) clear()
+                onClick={async () => {
                   close()
+                  if (!empty) {
+                    const ok = await confirm({
+                      title: 'Clear the whole design?',
+                      body: 'Every panel and sheet is removed. This can be undone with Ctrl+Z.',
+                      confirmLabel: 'Clear all',
+                      destructive: true,
+                    })
+                    if (ok) clear()
+                  }
                 }}
               >
                 New (clear all)

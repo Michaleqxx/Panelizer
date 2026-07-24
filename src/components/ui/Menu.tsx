@@ -114,17 +114,19 @@ export function MenuChoices<T extends string | number>({
   onChange: (value: T) => void
 }) {
   return (
-    <div className="flex flex-wrap gap-1 px-3 pb-1.5">
+    // A real segmented control: equal-width targets big enough to hit, sharing
+    // one recessed track so the lit one reads as the current choice.
+    <div className="flex gap-1 rounded-md border border-edge bg-bg/60 p-1 mx-3 mb-2">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
           className={cx(
-            'cursor-pointer rounded border px-2 py-0.5 text-xs',
+            'flex-1 cursor-pointer rounded border px-2.5 py-1 text-small font-medium transition-colors',
             value === o.value
               ? 'border-accent bg-accent text-white'
-              : 'border-edge bg-surface-2 text-ink hover:bg-surface-3',
+              : 'border-transparent bg-transparent text-ink-dim hover:bg-surface-2 hover:text-ink',
           )}
         >
           {o.label}

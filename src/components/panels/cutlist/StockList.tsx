@@ -6,7 +6,7 @@ import { MeasurementInput } from '../../ui/MeasurementInput'
 import { Button } from '../../ui/Button'
 import { CONTROL, Field } from '../../ui/Field'
 import { Hint, Section, Swatch } from '../../ui/Panel'
-import { CheckIcon, PencilIcon } from './icons'
+import { CheckIcon, PencilIcon, TrashIcon } from './icons'
 
 /**
  * Kerf/margin settings plus the sheet-goods inventory. Each stock row collapses
@@ -127,13 +127,14 @@ function StockEditor({
         <MeasurementInput label="Width" value={stock.width} unit={unit} precision={precision} min={1} snap onChange={(v) => onChange({ width: v })} />
       </div>
 
-      {/* Destructive and confirm sit at opposite ends rather than side by side,
-          so "remove this sheet" can't be mis-clicked when reaching for "done".
-          Both are labelled here — an editor has room, and a bare ✕ next to a
-          bare ✓ is ambiguous. */}
-      <div className="mt-2.5 flex items-center justify-between gap-6">
-        <Button size="sm" variant="dangerGhost" onClick={onRemove}>
-          Remove
+      {/* There is no "cancel": edits apply live and are undoable with Ctrl+Z.
+          The other button deletes the sheet, which a bare ✕ beside a bare ✓
+          read as "cancel" — so it is spelled out, carries a bin, and stays red
+          at rest, well away from the confirm. */}
+      <div className="mt-2.5 flex items-center justify-between gap-6 border-t border-edge pt-2">
+        <Button size="sm" variant="danger" onClick={onRemove}>
+          <TrashIcon />
+          Delete sheet
         </Button>
         <Button size="sm" variant="primary" onClick={onDone}>
           <CheckIcon />

@@ -8,6 +8,7 @@ import { Viewport } from './components/viewport/Viewport'
 import { ViewportControls } from './components/viewport/ViewportControls'
 import { GestureReadout } from './components/viewport/GestureReadout'
 import { ResizableSidebar } from './components/layout/ResizableSidebar'
+import { ConfirmHost } from './components/ui/ConfirmDialog'
 import { useDesignStore } from './store/designStore'
 
 /** Whether a keystroke should be left to the focused field rather than treated
@@ -55,6 +56,7 @@ export default function App() {
         </ResizableSidebar>
       </main>
       <CutlistModal />
+      <ConfirmHost />
     </div>
   )
 }
