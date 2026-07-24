@@ -154,20 +154,29 @@ function StockSummary({
   const fmt = (mm: number) => formatMeasurement(mm, unit)
 
   return (
-    <div className="flex items-center gap-1.5 py-1 text-xs">
+    // Same row treatment as the parts and grain tables: separators, hover, and
+    // every number tabular so sheet sizes line up down the list.
+    <div className="group flex items-center gap-1.5 border-b border-edge/60 py-1 text-[13px] transition-colors last:border-b-0 hover:bg-surface-2">
       <Swatch color={material?.color} />
-      <span className="shrink-0 text-ink">
-        {material?.name} · {fmt(stock.thickness)}
+      <span className="min-w-0 flex-1 truncate text-ink">{material?.name}</span>
+      <span className="shrink-0 text-ink-dim tabular-nums">{fmt(stock.thickness)}</span>
+      <span className="text-small shrink-0 text-ink-faint tabular-nums">
+        {fmt(stock.length)} × {fmt(stock.width)}
       </span>
-      <span className="flex-1 truncate text-ink-dim">
-        {fmt(stock.length)} × {fmt(stock.width)} · {stock.quantity ? `${stock.quantity}×` : '∞'}
+      {/* Quantity reads as a chip so "∞" and "3×" don't get lost in the run of
+          dimensions. */}
+      <span className="text-micro shrink-0 rounded-full bg-surface-3 px-1.5 py-px text-ink-dim tabular-nums">
+        {stock.quantity ? `${stock.quantity}×` : '∞'}
       </span>
-      <Button variant="ghost" icon aria-label="Edit stock" onClick={onEdit}>
-        <PencilIcon />
-      </Button>
-      <Button variant="danger" icon aria-label="Remove stock" onClick={onRemove}>
-        ✕
-      </Button>
+      {/* Actions stay quiet until the row is hovered or focused. */}
+      <span className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+        <Button variant="ghost" icon aria-label="Edit stock" onClick={onEdit}>
+          <PencilIcon />
+        </Button>
+        <Button variant="danger" icon aria-label="Remove stock" onClick={onRemove}>
+          ✕
+        </Button>
+      </span>
     </div>
   )
 }

@@ -1,9 +1,9 @@
-import { partNames } from '../../../lib/parts'
 import { formatMeasurement, type Unit } from '../../../lib/units'
 import { useDesignStore } from '../../../store/designStore'
 import { GrainThumb } from './GrainThumb'
 import { nextGrain } from './grainCycle'
 import { Section, Swatch } from '../../ui/Panel'
+import { PartNames } from '../../ui/PartNames'
 import { cx } from '../../ui/cx'
 import type { GrainGroup } from './useCutlistModel'
 
@@ -49,11 +49,16 @@ export function GrainEditor({
   return (
     <Section title="Grain">
       {groups.map((group) => (
-        <div className="mb-2" key={`${group.material}@${group.thickness}`}>
-          <div className="mb-0.5 flex items-center gap-1.5 text-xs text-ink-dim">
-            <Swatch color={group.color} /> {group.material} · {fmt(group.thickness)}
+        <div className="mb-3 last:mb-0" key={`${group.material}@${group.thickness}`}>
+          {/* Stock heading: the same "header for the rows it owns" treatment the
+              parts list gives an expanded group. */}
+          <div className="flex items-center gap-1.5 rounded-t border-b border-edge-strong bg-surface-2 px-1.5 py-1">
+            <Swatch color={group.color} />
+            <span className="text-[13px] font-medium text-ink">{group.material}</span>
+            <span className="text-small text-ink-dim tabular-nums">· {fmt(group.thickness)}</span>
           </div>
-          <table className="w-full border-collapse text-xs">
+
+          <table className="w-full border-collapse text-[13px]">
             <tbody>
               {group.rows.map((row, i) => {
                 const note = unplacedNote(row.ids)
@@ -66,16 +71,19 @@ export function GrainEditor({
                   <tr
                     key={i}
                     className={cx(
-                      isHovered(row.ids) && 'bg-accent/15',
-                      !included && 'opacity-45 line-through',
+                      'border-b border-edge/60 transition-colors last:border-b-0',
+                      isHovered(row.ids) ? 'bg-accent/20' : 'hover:bg-surface-2',
+                      // An excluded part stays legible — it's dimmed, not
+                      // struck through, so its size can still be read.
+                      !included && 'text-ink-faint',
                     )}
                     onMouseEnter={() => onHover(row.ids)}
                     onMouseLeave={() => onHover(null)}
                   >
-                    <td className="w-5">
+                    <td className="w-7 pl-1.5">
                       <input
                         type="checkbox"
-                        className="cursor-pointer accent-accent"
+                        className="size-3.5 cursor-pointer accent-accent"
                         checked={included}
                         onChange={() => toggleIncluded(row.ids)}
                         aria-label={included ? 'Exclude from cutlist (already cut)' : 'Include in cutlist'}
@@ -84,19 +92,21 @@ export function GrainEditor({
                         )}
                       />
                     </td>
-                    <td className="py-1 text-ink">
-                      {partNames(row.parts)}
-                      {note && (
-                        <span className="ml-1 cursor-help text-snap-middle" {...tipProps(note)}>
-                          ⚠
-                        </span>
-                      )}
+                    <td className={cx('py-1.5 pr-1', included && 'text-ink')}>
+                      <span className="flex min-w-0 items-center gap-1">
+                        <PartNames names={row.parts} />
+                        {note && (
+                          <span className="shrink-0 cursor-help text-snap-middle" {...tipProps(note)}>
+                            ⚠
+                          </span>
+                        )}
+                      </span>
                     </td>
-                    <td className="py-1 text-ink-dim">{row.quantity}×</td>
-                    <td className="py-1 text-ink-dim tabular-nums">
+                    <td className="w-8 py-1.5 text-right text-ink-dim tabular-nums">{row.quantity}×</td>
+                    <td className="py-1.5 pl-2 text-right text-ink-dim tabular-nums">
                       {fmt(row.length)} × {fmt(row.width)}
                     </td>
-                    <td className="w-11">
+                    <td className="w-12 py-1 pl-1.5">
                       <GrainThumb
                         length={panel?.length ?? row.length}
                         width={panel?.width ?? row.width}

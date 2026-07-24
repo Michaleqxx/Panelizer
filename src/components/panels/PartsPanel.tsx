@@ -6,6 +6,7 @@ import { useDesignStore } from '../../store/designStore'
 import { useTooltip } from '../ui/useTooltip'
 import { Button } from '../ui/Button'
 import { Hint, Section, Swatch } from '../ui/Panel'
+import { PartNames } from '../ui/PartNames'
 import { cx } from '../ui/cx'
 
 type PartRow = ReturnType<typeof buildParts>[number]
@@ -123,34 +124,6 @@ export function PartsPanel() {
         {rows.length === 1 ? '' : 's'} · dimensions in {UNIT_SUFFIX[unit]}
       </p>
     </Section>
-  )
-}
-
-/**
- * The group's part name(s), kept to one line. A group is usually all one name
- * ("Side"), but differently-named panels can share a size — rather than letting
- * "Side, Side copy, Side copy 2…" push the dimensions off the row, only the
- * first name is shown and the rest collapse into a `+n` chip that names them on
- * hover. Expanding the group lists them all anyway.
- */
-function PartNames({ names }: { names: string[] }) {
-  const distinct = [...new Set(names)]
-  const [first, ...rest] = distinct
-  const tip = useTooltip(distinct.join(', '))
-
-  return (
-    <span className="flex min-w-0 items-center gap-1">
-      <span className="truncate">{first}</span>
-      {rest.length > 0 && (
-        <span
-          className="text-micro shrink-0 cursor-help rounded-full bg-surface-3 px-1.5 py-px text-ink-dim"
-          {...tip.trigger}
-        >
-          +{rest.length}
-          {tip.node}
-        </span>
-      )}
-    </span>
   )
 }
 
