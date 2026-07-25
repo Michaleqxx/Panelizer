@@ -163,7 +163,11 @@ export function ToolOverlay() {
             // Cap below the cutlist overlay (z-index 50) so it can't float over it.
             zIndexRange={[40, 0]}
           >
-            <span className="rounded border border-accent bg-surface px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap text-ink tabular-nums">
+            {/* Read from across the model, not from the sidebar, so the size is
+                set in px rather than rem — the rem scale is anchored to the
+                13px panel chrome and `text-base` would land at 13px too. The
+                shadow keeps it legible over a light plywood face. */}
+            <span className="rounded-md border border-accent bg-surface/95 px-3 py-1.5 text-[17px] leading-none font-semibold whitespace-nowrap text-ink shadow-lg shadow-black/50 tabular-nums">
               {formatMeasurement(distance(measurement.a, measurement.b), unit)}
             </span>
           </Html>
