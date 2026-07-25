@@ -167,7 +167,7 @@ export function ToolOverlay() {
                 set in px rather than rem — the rem scale is anchored to the
                 13px panel chrome and `text-base` would land at 13px too. The
                 shadow keeps it legible over a light plywood face. */}
-            <span className="rounded-md border border-accent bg-surface/95 px-3 py-1.5 text-[17px] leading-none font-semibold whitespace-nowrap text-ink shadow-lg shadow-black/50 tabular-nums">
+            <span className="rounded border border-accent bg-surface/95 px-2 py-1 text-[14px] leading-none font-semibold whitespace-nowrap text-ink shadow-md shadow-black/50 tabular-nums">
               {formatMeasurement(distance(measurement.a, measurement.b), unit)}
             </span>
           </Html>
