@@ -6,6 +6,7 @@ import { toMetres } from '../../lib/geometry'
 import { distance, panelCorners, type Point } from '../../lib/corners'
 import { formatMeasurement } from '../../lib/units'
 import { useDesignStore } from '../../store/designStore'
+import { palette } from './palette'
 
 const HIT_RADIUS = 0.03 // invisible click target (m)
 const DOT_RADIUS = 0.004 // visible dot (m); grows on hover / selection
@@ -36,6 +37,7 @@ function Corner({
 }) {
   const ref = useRef<Group>(null!)
   const pos = new Vector3(...toMetres(world))
+  const paint = palette()
 
   useFrame(({ camera }) => {
     if (ref.current) ref.current.scale.setScalar(camera.position.distanceTo(pos) / NOMINAL_DIST)
@@ -74,7 +76,7 @@ function Corner({
       <mesh>
         <sphereGeometry args={[active ? DOT_RADIUS * 1.8 : DOT_RADIUS, 16, 16]} />
         <meshBasicMaterial
-          color={selected ? '#2a6cff' : active ? '#ffffff' : '#9fb4d8'}
+          color={selected ? paint.accent : active ? paint.cornerActive : paint.corner}
           transparent
           opacity={active ? 1 : 0.5}
         />
@@ -102,6 +104,7 @@ export function ToolOverlay() {
   const setMeasurement = useDesignStore((s) => s.setMeasurement)
 
   const [hovered, setHovered] = useState<string | null>(null)
+  const paint = palette()
 
   if (tool === 'move' || tool === 'resize') return null
 
@@ -152,7 +155,7 @@ export function ToolOverlay() {
 
       {measurement && (
         <>
-          <Line points={[toMetres(measurement.a), toMetres(measurement.b)]} color="#2a6cff" lineWidth={2} />
+          <Line points={[toMetres(measurement.a), toMetres(measurement.b)]} color={paint.accent} lineWidth={2} />
           <Html
             position={toMetres([
               (measurement.a[0] + measurement.b[0]) / 2,

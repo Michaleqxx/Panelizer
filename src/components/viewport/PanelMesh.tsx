@@ -8,6 +8,7 @@ import { roundToUnitGrid } from '../../lib/units'
 import { SNAP_THRESHOLD_MM, snapGroupDelta, snapHintFromTarget } from '../../lib/snapping'
 import { useDesignStore } from '../../store/designStore'
 import { ResizeHandles } from './ResizeHandles'
+import { palette } from './palette'
 
 type Vec3 = [number, number, number]
 
@@ -52,6 +53,7 @@ export function PanelMesh({ panel }: { panel: Panel }) {
   const precision = useDesignStore((s) => s.precision)
   const color = useDesignStore((s) => findMaterial(s.materials, panel.materialId).color)
 
+  const paint = palette()
   const hidden = panel.hidden === true
   const selected = selectedIds.includes(panel.id)
   // The last-selected panel carries the move gizmo for the whole group.
@@ -246,14 +248,17 @@ export function PanelMesh({ panel }: { panel: Panel }) {
             it rendering opaque. */}
         <meshStandardMaterial
           key={hidden ? 'ghost' : 'solid'}
-          color={hidden ? '#c9ced7' : color}
+          color={hidden ? paint.ghost : color}
           transparent={hidden}
           opacity={hidden ? 0.2 : 1}
           depthWrite={!hidden}
-          emissive={selected ? '#2a6cff' : '#000000'}
+          emissive={selected ? paint.accent : paint.none}
           emissiveIntensity={selected ? 0.35 : 0}
         />
-        <Edges threshold={15} color={selected ? '#2a6cff' : hidden ? '#6a7180' : '#5a4a32'} />
+        <Edges
+          threshold={15}
+          color={selected ? paint.accent : hidden ? paint.ghostEdge : paint.panelEdge}
+        />
       </mesh>
 
       {!hidden && selected && isPrimary && tool === 'move' && (

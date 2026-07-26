@@ -7,6 +7,7 @@ import { roundToUnitGrid } from '../../lib/units'
 import { resizeAlongAxis } from '../../lib/resize'
 import { SNAP_THRESHOLD_MM, snapHintFromTarget, snapResizeFace, type SnapHitTarget } from '../../lib/snapping'
 import { useDesignStore } from '../../store/designStore'
+import { palette } from './palette'
 
 type Axis3 = 0 | 1 | 2
 type FaceSign = 1 | -1
@@ -68,6 +69,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
   const gestureOpen = useRef(false)
   const lastDelta = useRef(0)
   const [hovered, setHovered] = useState(false)
+  const paint = palette()
 
   // Safety net: if this handle unmounts mid-gesture (tool switch, deselect),
   // make sure orbit is turned back on and no snap guide is left hanging.
@@ -220,7 +222,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
       {/* Non-interactive face tint so it's obvious which dimension a handle grows. */}
       <mesh position={toMetres(faceCenter)} raycast={() => null}>
         <boxGeometry args={slabSize} />
-        <meshBasicMaterial color="#ff8a2a" transparent opacity={hovered ? 0.25 : 0.08} depthWrite={false} />
+        <meshBasicMaterial color={paint.resize} transparent opacity={hovered ? 0.25 : 0.08} depthWrite={false} />
       </mesh>
 
       <group position={toMetres(handleCenter)}>
@@ -245,7 +247,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
         {/* Visible ball (non-interactive; the hit sphere above owns pointers). */}
         <mesh raycast={() => null}>
           <sphereGeometry args={[HANDLE_RADIUS_M, 16, 16]} />
-          <meshBasicMaterial color={hovered ? '#ffab5e' : '#ff8a2a'} depthTest={false} />
+          <meshBasicMaterial color={hovered ? paint.resizeHover : paint.resize} depthTest={false} />
         </mesh>
       </group>
     </>

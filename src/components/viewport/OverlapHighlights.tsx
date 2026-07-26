@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { toMetres } from '../../lib/geometry'
 import { overlapBoxes } from '../../lib/overlaps'
+import { palette } from './palette'
 import { useDesignStore } from '../../store/designStore'
 
 /** Slightly grow each overlay so it pokes through the panels and doesn't
@@ -12,6 +13,7 @@ const PAD = 1.5
 export function OverlapHighlights() {
   const panels = useDesignStore((s) => s.panels)
   const boxes = useMemo(() => overlapBoxes(panels), [panels])
+  const paint = palette()
 
   return (
     <>
@@ -19,8 +21,8 @@ export function OverlapHighlights() {
         <mesh key={i} position={toMetres(box.center)}>
           <boxGeometry args={toMetres([box.size[0] + PAD, box.size[1] + PAD, box.size[2] + PAD])} />
           <meshStandardMaterial
-            color="#1fd1c4"
-            emissive="#1fd1c4"
+            color={paint.overlap}
+            emissive={paint.overlap}
             emissiveIntensity={0.4}
             transparent
             opacity={0.55}

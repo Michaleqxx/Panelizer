@@ -32,7 +32,20 @@
   --color-snap-butt: #4c86ff;
   --color-snap-middle: #ffb02e;
   --color-resize: #ff8a2a;
+  --color-resize-hover: #ffab5e;
   --color-overlap: #1fd1c4;
+
+  /* 3D viewport. three.js materials take colour strings, not classes, so these
+     are read back out of the stylesheet by `viewport/palette.ts` rather than
+     re-declared in TypeScript — the viewport used to keep its own copies and
+     drifted the moment the accent changed. */
+  --color-scene: #0e1014;
+  --color-scene-grid: #2a2f39;
+  --color-scene-grid-major: #3f4653;
+  --color-panel-edge: #5a4a32;
+  --color-ghost: #c9ced7;
+  --color-ghost-edge: #6a7180;
+  --color-corner: #9fb4d8;
 
   --radius-DEFAULT: 6px;
 
