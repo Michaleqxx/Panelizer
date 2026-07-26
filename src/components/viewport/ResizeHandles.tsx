@@ -8,6 +8,7 @@ import { resizeAlongAxis } from '../../lib/resize'
 import { SNAP_THRESHOLD_MM, snapHintFromTarget, snapResizeFace, type SnapHitTarget } from '../../lib/snapping'
 import { useDesignStore } from '../../store/designStore'
 import { palette } from './palette'
+import { useGesture, type GestureSpec } from './useGesture'
 
 type Axis3 = 0 | 1 | 2
 type FaceSign = 1 | -1
@@ -53,10 +54,6 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
   const resizePanelLive = useDesignStore((s) => s.resizePanelLive)
   const restorePanels = useDesignStore((s) => s.restorePanels)
   const setOrbit = useDesignStore((s) => s.setOrbitEnabled)
-  const armSelectSuppression = useDesignStore((s) => s.armSelectSuppression)
-  const startGesture = useDesignStore((s) => s.startGesture)
-  const setGestureDelta = useDesignStore((s) => s.setGestureDelta)
-  const setGestureEditable = useDesignStore((s) => s.setGestureEditable)
   const clearGesture = useDesignStore((s) => s.clearGesture)
   const setSnapHints = useDesignStore((s) => s.setSnapHints)
   const unit = useDesignStore((s) => s.unit)
@@ -66,10 +63,10 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
   const invalidate = useThree((s) => s.invalidate)
 
   const drag = useRef<DragStart | null>(null)
-  const gestureOpen = useRef(false)
   const lastDelta = useRef(0)
   const [hovered, setHovered] = useState(false)
   const paint = palette()
+  const gesture = useGesture()
 
   // Safety net: if this handle unmounts mid-gesture (tool switch, deselect),
   // make sure orbit is turned back on and no snap guide is left hanging.
@@ -138,37 +135,33 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
     updatePanel(panel.id, { [result.field]: size, position })
   }
 
-  // Open the corner readout for this resize: apply/commit/cancel all work from
-  // the frozen start panel captured at pointer-down.
-  const openGesture = (startPanel: Panel, symmetric: boolean) => {
-    startGesture({
-      kind: 'resize',
-      label,
-      delta: 0,
-      editable: false,
-      apply: (mm) => {
-        lastDelta.current = mm
-        applyFrom(startPanel, mm, symmetric, false)
-      },
-      commit: () => {
-        applyFrom(startPanel, lastDelta.current, symmetric, true)
-        clearGesture()
-      },
-      cancel: () => {
-        const original = resizeAlongAxis(startPanel, axis, faceSign, 0, symmetric)
-        if (original) {
-          restorePanels([{ id: panel.id, patch: { [original.field]: original.value, position: original.position } }])
-        }
-        clearGesture()
-      },
-    })
-  }
+  // What the corner readout does for this resize: apply/commit/cancel all work
+  // from the frozen start panel captured at pointer-down.
+  const resizeGesture = (startPanel: Panel, symmetric: boolean): GestureSpec => ({
+    kind: 'resize',
+    label,
+    apply: (mm) => {
+      lastDelta.current = mm
+      applyFrom(startPanel, mm, symmetric, false)
+    },
+    commit: () => {
+      applyFrom(startPanel, lastDelta.current, symmetric, true)
+      clearGesture()
+    },
+    cancel: () => {
+      const original = resizeAlongAxis(startPanel, axis, faceSign, 0, symmetric)
+      if (original) {
+        restorePanels([{ id: panel.id, patch: { [original.field]: original.value, position: original.position } }])
+      }
+      clearGesture()
+    },
+  })
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture(e.pointerId)
     setOrbit(false)
-    gestureOpen.current = false
+    gesture.begin()
     const p0 = new Vector3(...toMetres(faceCenter))
     drag.current = { panel, p0, param0: axisParam(e.ray, p0) }
   }
@@ -190,11 +183,11 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
     }
     lastDelta.current = deltaMm
     applyFrom(drag.current.panel, deltaMm, e.nativeEvent.altKey, false)
-    if (!gestureOpen.current) {
-      openGesture(drag.current.panel, e.nativeEvent.altKey)
-      gestureOpen.current = true
-    }
-    setGestureDelta(deltaMm)
+
+    const startPanel = drag.current.panel
+    const symmetric = e.nativeEvent.altKey
+    gesture.track(deltaMm, () => resizeGesture(startPanel, symmetric))
+
     showSnap(fs.snap)
     invalidate()
   }
@@ -209,12 +202,8 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
     drag.current = null
     setOrbit(true)
     setSnapHints([]) // the guide belongs to the live drag only
-    if (Math.abs(deltaMm) >= CLICK_THRESHOLD_MM) {
-      armSelectSuppression() // don't let the drag-release click select a panel
-      setGestureEditable() // keep the readout open, now typeable
-    } else {
-      clearGesture()
-    }
+    if (Math.abs(deltaMm) >= CLICK_THRESHOLD_MM) gesture.keepForTyping()
+    else gesture.dismiss()
   }
 
   return (
