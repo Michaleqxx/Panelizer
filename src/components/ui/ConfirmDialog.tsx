@@ -35,15 +35,24 @@ export function ConfirmHost() {
       onClick={() => settle(false)}
     >
       <div
-        className="w-full max-w-sm rounded-lg border border-edge bg-surface shadow-2xl"
+        className="flex max-h-full w-full max-w-md flex-col rounded-lg border border-edge bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="m-0 border-b border-edge px-4 py-3 text-base font-semibold">{request.title}</h2>
-        <div className="text-small px-4 py-3 leading-relaxed text-ink-dim">{request.body}</div>
-        <div className="flex justify-end gap-3 border-t border-edge px-4 py-3">
+        <h2 className="m-0 shrink-0 border-b border-edge px-4 py-3 text-base font-semibold">
+          {request.title}
+        </h2>
+        {/* Scrolls rather than growing: a dialog must never outrun the window,
+            whatever it is asked to show. */}
+        <div className="text-small min-h-0 overflow-y-auto px-4 py-3 leading-relaxed text-ink-dim">
+          {request.body}
+        </div>
+        <div className="flex shrink-0 justify-end gap-3 border-t border-edge px-4 py-3">
           {!request.dismissOnly && <Button onClick={() => settle(false)}>Cancel</Button>}
+          {/* An informational dialog's button only dismisses it — it isn't the
+              primary action, and styling it as one competes with whatever the
+              body is actually offering (the share dialog's Copy, say). */}
           <Button
-            variant={request.destructive ? 'danger' : 'primary'}
+            variant={request.dismissOnly ? 'default' : request.destructive ? 'danger' : 'primary'}
             autoFocus
             onClick={() => settle(true)}
           >

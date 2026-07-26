@@ -9,6 +9,7 @@ import { Menu, MenuChoices, MenuItem, MenuLabel, MenuList } from '../ui/Menu'
 import { Button } from '../ui/Button'
 import { cx } from '../ui/cx'
 import { useConfirm } from '../ui/useConfirm'
+import { CopyField } from '../ui/CopyField'
 import { ToolHint } from '../layout/ToolHint'
 
 /** Quick-add presets so a carcass can be roughed out in a few clicks. Each sets
@@ -81,30 +82,21 @@ export function Toolbar() {
   }
 
   // The whole design travels inside the link, so there is nothing to upload and
-  // no server involved. Copying can fail (denied permission, insecure origin),
-  // so the link is always shown as well rather than only promised.
+  // no server involved. Copying is left to the field rather than done up front:
+  // one predictable path, and the link is always there to select by hand.
   const share = async (close: () => void) => {
     close()
     const link = await designToLink({ panels, materials, stocks, unit, precision, kerf, margin })
 
-    let copied = false
-    try {
-      await navigator.clipboard.writeText(link)
-      copied = true
-    } catch {
-      // Fall through — the dialog shows the link either way.
-    }
-
     await confirm({
-      title: copied ? 'Link copied' : 'Share link',
+      title: 'Share this design',
       body: (
         <>
-          <p className="m-0 mb-2">
-            {copied
-              ? 'The link is on your clipboard. Anyone who opens it gets this design.'
-              : 'Copy this link — anyone who opens it gets this design.'}
+          <p className="m-0 mb-3">
+            Anyone who opens this link gets a copy of the design. Nothing is uploaded — the whole
+            thing travels inside the link itself.
           </p>
-          <p className="m-0 break-all text-ink-faint select-all">{link}</p>
+          <CopyField value={link} label="Copy link" />
         </>
       ),
       confirmLabel: 'Done',
