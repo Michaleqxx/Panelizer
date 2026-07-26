@@ -3,6 +3,7 @@ import { Grid, OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/dr
 import { useDesignStore } from '../../store/designStore'
 import { Scene } from './Scene'
 import { MarqueePicker } from './MarqueePicker'
+import { palette } from './palette'
 
 /** The 3D workspace: lighting, a reference floor grid, orbit navigation, an
  *  orientation gizmo, and the cabinet scene. Clicking empty space deselects. */
@@ -10,6 +11,7 @@ export function Viewport() {
   const select = useDesignStore((s) => s.select)
   const orbitEnabled = useDesignStore((s) => s.orbitEnabled)
   const dragMode = useDesignStore((s) => s.dragMode)
+  const paint = palette()
 
   return (
     <Canvas
@@ -19,7 +21,7 @@ export function Viewport() {
       // so a marquee box-drag never triggers it — the two don't collide.
       onPointerMissed={() => select(null)}
     >
-      <color attach="background" args={['#1a1c20']} />
+      <color attach="background" args={[paint.scene]} />
       <ambientLight intensity={0.6} />
       <directionalLight position={[3, 5, 2]} intensity={1.3} />
       <directionalLight position={[-2, 2, -3]} intensity={0.4} />
@@ -27,9 +29,9 @@ export function Viewport() {
       <Grid
         args={[10, 10]}
         cellSize={0.1}
-        cellColor="#3a3d44"
+        cellColor={paint.grid}
         sectionSize={1}
-        sectionColor="#55585f"
+        sectionColor={paint.gridMajor}
         fadeDistance={18}
         fadeStrength={1.5}
         infiniteGrid

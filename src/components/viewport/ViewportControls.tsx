@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDesignStore } from '../../store/designStore'
 import { useTooltip } from '../ui/useTooltip'
+import { cx } from '../ui/cx'
 
 /** Below this drag distance (px) a gesture is a click, not a marquee. */
 const DRAG_THRESHOLD_PX = 4
@@ -84,35 +85,69 @@ export function ViewportControls() {
   }, [dragMode, setMarqueeBox])
 
   return (
-    <div ref={rootRef} className="viewport-controls">
-      <div className="viewport-mode" role="group" aria-label="Left-drag mode">
-        <button
-          className={dragMode === 'orbit' ? 'is-active' : ''}
+    <div ref={rootRef} className="pointer-events-none absolute inset-0">
+      <div
+        className="pointer-events-auto absolute top-3 left-3 flex gap-1 rounded border border-edge bg-surface/95 p-1"
+        role="group"
+        aria-label="Left-drag mode"
+      >
+        <ModeButton
+          active={dragMode === 'orbit'}
           onClick={() => setDragMode('orbit')}
-          aria-label="Rotate mode"
-          {...rotateTip.trigger}
+          label="Rotate mode"
+          tip={rotateTip}
         >
           <RotateIcon />
-          {rotateTip.node}
-        </button>
-        <button
-          className={dragMode === 'select' ? 'is-active' : ''}
+        </ModeButton>
+        <ModeButton
+          active={dragMode === 'select'}
           onClick={() => setDragMode('select')}
-          aria-label="Box select mode"
-          {...selectTip.trigger}
+          label="Box select mode"
+          tip={selectTip}
         >
           <SelectIcon />
-          {selectTip.node}
-        </button>
+        </ModeButton>
       </div>
 
       {rect && (
         <div
-          className="viewport-marquee"
+          className="absolute border border-accent bg-accent/15"
           style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
         />
       )}
     </div>
+  )
+}
+
+function ModeButton({
+  active,
+  onClick,
+  label,
+  tip,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  label: string
+  tip: { trigger: object; node: React.ReactNode }
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      className={cx(
+        'cursor-pointer rounded border p-1.5 transition-colors',
+        active
+          ? 'border-accent bg-accent text-white'
+          : 'border-transparent text-ink-dim hover:bg-surface-2 hover:text-ink',
+      )}
+      onClick={onClick}
+      aria-label={label}
+      {...tip.trigger}
+    >
+      {children}
+      {tip.node}
+    </button>
   )
 }
 

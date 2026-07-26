@@ -1,13 +1,10 @@
 import type { Panel } from '../types/panel'
 import { roundToUnitGrid, type Unit } from './units'
 import { panelBoxSize } from './geometry'
+import { JOINT_TOL, boundsFromCentre, overlapsPerpendicular, type Bounds } from './bounds'
 
 type Vec3 = [number, number, number]
 
-/** Only joints already within this many mm are treated as "meant to touch" and
- *  welded shut. Bigger gaps (e.g. a 2-3 mm door/drawer reveal) are intentional
- *  space and left alone. Drift from rounding is well under a millimetre. */
-const CONTACT_TOL = 1.5
 /** Slack allowed when testing whether two panels overlap on the axes across from
  *  the joint (so a face flush to an edge still counts). */
 const PERP_TOL = 0.5
@@ -27,61 +24,43 @@ interface Joint {
   sj: -1 | 1
 }
 
+const boundsFace = (b: Bounds, axis: number, sign: number) => (sign === 1 ? b.max[axis] : b.min[axis])
+
 /**
- * Heal an imperial design that drifted while whole-millimetre / grid rounding
- * was in effect: snap every panel's thickness back onto the exact unit grid
- * (e.g. 19 mm → a true 3/4"), then close the hairline gaps at every joint so a
- * row of parts adds up exactly.
- *
- * Gap closing is a fixed-point relaxation. Joints (pairs of faces already within
- * {@link CONTACT_TOL}) are detected once. Each connected cluster is anchored at
- * its min-corner panel; a breadth-first pass assigns every panel a depth from
- * that anchor. Then we relax repeatedly — for each joint the panel *further* from
- * the anchor is moved onto the nearer one — until nothing moves. Because motion
- * only ever flows away from the fixed anchor, it converges (no oscillation) and
- * the anchor's corner stays put while the far end pulls in to close every gap.
+ * Snap every size (length, width, thickness) onto the unit's grid so each part
+ * reads and stores as an exact fraction — what you see is what's cut, and
+ * identical parts become byte-identical (so they group). The doc works in one
+ * unit, so an off-grid metric thickness in an inch doc is genuinely being
+ * converted to the nearest 1/16", by design.
  */
-export function repairPrecision(panels: Panel[], unit: Unit, precision: number): Panel[] {
-  // 1) Snap every size (length, width, thickness) onto the unit's grid so each
-  //    part reads and stores as an exact fraction — what you see is what's cut,
-  //    and identical parts become byte-identical (so they group). The doc works
-  //    in one unit, so an off-grid metric thickness in an inch doc is genuinely
-  //    being converted to the nearest 1/16", by design.
+function snapSizes(panels: Panel[], unit: Unit, precision: number): Panel[] {
   const grid = (v: number) => roundToUnitGrid(v, unit, precision)
-  const fixed = panels.map((p) => ({
+  return panels.map((p) => ({
     ...p,
     length: grid(p.length),
     width: grid(p.width),
     thickness: grid(p.thickness),
   }))
+}
 
-  const pos: Vec3[] = fixed.map((p) => [...p.position] as Vec3)
-  const half: Vec3[] = fixed.map((p) => {
-    const s = panelBoxSize(p)
-    return [s[0] / 2, s[1] / 2, s[2] / 2] as Vec3
-  })
-  const face = (idx: number, axis: number, sign: number) => pos[idx][axis] + sign * half[idx][axis]
-
-  const perpOverlap = (i: number, j: number, axis: number): boolean => {
-    for (let k = 0; k < 3; k++) {
-      if (k === axis) continue
-      if (face(i, k, 1) < face(j, k, -1) - PERP_TOL || face(i, k, -1) > face(j, k, 1) + PERP_TOL) return false
-    }
-    return true
-  }
-
-  // 2) Detect joints: for each pair + axis where the panels overlap across the
-  //    joint, weld the closest face-pair if it's already within tolerance.
+/**
+ * Find the joints to weld: for each pair + axis where the panels overlap across
+ * the joint, weld the closest face-pair if it's already within
+ * {@link JOINT_TOL}. Bigger gaps (e.g. a 2-3 mm door reveal) are intentional
+ * space and left alone.
+ */
+function detectJoints(bounds: Bounds[]): Joint[] {
   const joints: Joint[] = []
-  for (let i = 0; i < fixed.length; i++) {
-    for (let j = i + 1; j < fixed.length; j++) {
+
+  for (let i = 0; i < bounds.length; i++) {
+    for (let j = i + 1; j < bounds.length; j++) {
       for (let axis = 0; axis < 3; axis++) {
-        if (!perpOverlap(i, j, axis)) continue
-        let best = CONTACT_TOL
+        if (!overlapsPerpendicular(bounds[i], bounds[j], axis, PERP_TOL)) continue
+        let best = JOINT_TOL
         let pick: Joint | null = null
         for (const si of [-1, 1] as const) {
           for (const sj of [-1, 1] as const) {
-            const d = Math.abs(face(i, axis, si) - face(j, axis, sj))
+            const d = Math.abs(boundsFace(bounds[i], axis, si) - boundsFace(bounds[j], axis, sj))
             if (d <= best) {
               best = d
               pick = { i, j, axis: axis as 0 | 1 | 2, si, sj }
@@ -93,53 +72,81 @@ export function repairPrecision(panels: Panel[], unit: Unit, precision: number):
     }
   }
 
-  // 3) Anchor each connected cluster and assign a depth from it.
-  const adj: number[][] = fixed.map(() => [])
+  return joints
+}
+
+/**
+ * Anchor each connected cluster of joints at its min-corner panel and return
+ * every panel's breadth-first depth from that anchor. Relaxation then only ever
+ * moves the deeper endpoint of a joint, so motion flows away from the fixed
+ * anchor and the solve converges instead of oscillating.
+ */
+function anchorDepths(joints: Joint[], bounds: Bounds[]): number[] {
+  const adjacency: number[][] = bounds.map(() => [])
   for (const c of joints) {
-    adj[c.i].push(c.j)
-    adj[c.j].push(c.i)
+    adjacency[c.i].push(c.j)
+    adjacency[c.j].push(c.i)
   }
-  const depth = new Array<number>(fixed.length).fill(-1)
+
+  const depth = new Array<number>(bounds.length).fill(-1)
+
+  // Lexicographic min-corner, to pick a stable anchor per cluster.
   const lower = (a: number, b: number) => {
-    // lexicographic min-corner, to pick a stable anchor per cluster
     for (let k = 0; k < 3; k++) {
-      const d = face(a, k, -1) - face(b, k, -1)
+      const d = bounds[a].min[k] - bounds[b].min[k]
       if (Math.abs(d) > 1e-9) return d < 0
     }
     return a < b
   }
-  for (let seed = 0; seed < fixed.length; seed++) {
+
+  for (let seed = 0; seed < bounds.length; seed++) {
     if (depth[seed] !== -1) continue
+
+    // Collect the cluster (depth is a provisional "seen" marker here).
     const cluster: number[] = []
     const stack = [seed]
-    depth[seed] = 0 // provisional "seen" marker; recomputed below
+    depth[seed] = 0
     while (stack.length) {
       const u = stack.pop()!
       cluster.push(u)
-      for (const v of adj[u])
+      for (const v of adjacency[u])
         if (depth[v] === -1) {
           depth[v] = 0
           stack.push(v)
         }
     }
+
     let anchor = cluster[0]
     for (const u of cluster) if (lower(u, anchor)) anchor = u
+
+    // Recompute the real depths outward from the anchor.
     for (const u of cluster) depth[u] = -1
     depth[anchor] = 0
     const queue = [anchor]
     while (queue.length) {
       const u = queue.shift()!
-      for (const v of adj[u])
+      for (const v of adjacency[u])
         if (depth[v] === -1) {
           depth[v] = depth[u] + 1
           queue.push(v)
         }
     }
   }
+
+  return depth
+}
+
+/**
+ * Relax until settled: for each joint, pull the panel *further* from its
+ * cluster anchor onto the nearer one. Mutates `pos` in place. Because motion
+ * only ever flows away from the fixed anchor, this converges — the anchor's
+ * corner stays put while the far end pulls in to close every gap.
+ */
+function relax(joints: Joint[], pos: Vec3[], half: Vec3[], depth: number[]): void {
+  const face = (idx: number, axis: number, sign: number) => pos[idx][axis] + sign * half[idx][axis]
   // Deeper (or, at equal depth, higher-index) endpoint is the one that moves.
   const moves = (a: number, b: number) => depth[a] > depth[b] || (depth[a] === depth[b] && a > b)
 
-  // 4) Relax until settled: pull each joint's deeper panel onto the nearer one.
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     let worst = 0
     for (const c of joints) {
@@ -151,6 +158,27 @@ export function repairPrecision(panels: Panel[], unit: Unit, precision: number):
     }
     if (worst < SETTLE_MM) break
   }
+}
+
+/**
+ * Heal an imperial design that drifted while whole-millimetre / grid rounding
+ * was in effect: snap every panel's thickness back onto the exact unit grid
+ * (e.g. 19 mm → a true 3/4"), then close the hairline gaps at every joint so a
+ * row of parts adds up exactly.
+ *
+ * Runs as four phases: {@link snapSizes} → {@link detectJoints} →
+ * {@link anchorDepths} → {@link relax}.
+ */
+export function repairPrecision(panels: Panel[], unit: Unit, precision: number): Panel[] {
+  const fixed = snapSizes(panels, unit, precision)
+
+  const pos: Vec3[] = fixed.map((p) => [...p.position] as Vec3)
+  const half: Vec3[] = fixed.map((p) => panelBoxSize(p).map((s) => s / 2) as Vec3)
+  // Snapshot taken before relaxation, which is the only phase that moves panels.
+  const bounds = fixed.map((p, i) => boundsFromCentre(pos[i], panelBoxSize(p)))
+
+  const joints = detectJoints(bounds)
+  relax(joints, pos, half, anchorDepths(joints, bounds))
 
   return fixed.map((p, i) => ({ ...p, position: pos[i] }))
 }

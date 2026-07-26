@@ -2,12 +2,11 @@ import { useRef, useState } from 'react'
 import { Vector3, type Group } from 'three'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
-import { MM_TO_M } from '../../lib/geometry'
+import { toMetres } from '../../lib/geometry'
 import { distance, panelCorners, type Point } from '../../lib/corners'
 import { formatMeasurement } from '../../lib/units'
 import { useDesignStore } from '../../store/designStore'
-
-const toM = ([x, y, z]: Point): Point => [x * MM_TO_M, y * MM_TO_M, z * MM_TO_M]
+import { palette } from './palette'
 
 const HIT_RADIUS = 0.03 // invisible click target (m)
 const DOT_RADIUS = 0.004 // visible dot (m); grows on hover / selection
@@ -37,7 +36,8 @@ function Corner({
   onPick: () => void
 }) {
   const ref = useRef<Group>(null!)
-  const pos = new Vector3(...toM(world))
+  const pos = new Vector3(...toMetres(world))
+  const paint = palette()
 
   useFrame(({ camera }) => {
     if (ref.current) ref.current.scale.setScalar(camera.position.distanceTo(pos) / NOMINAL_DIST)
@@ -76,7 +76,7 @@ function Corner({
       <mesh>
         <sphereGeometry args={[active ? DOT_RADIUS * 1.8 : DOT_RADIUS, 16, 16]} />
         <meshBasicMaterial
-          color={selected ? '#2a6cff' : active ? '#ffffff' : '#9fb4d8'}
+          color={selected ? paint.accent : active ? paint.cornerActive : paint.corner}
           transparent
           opacity={active ? 1 : 0.5}
         />
@@ -104,6 +104,7 @@ export function ToolOverlay() {
   const setMeasurement = useDesignStore((s) => s.setMeasurement)
 
   const [hovered, setHovered] = useState<string | null>(null)
+  const paint = palette()
 
   if (tool === 'move' || tool === 'resize') return null
 
@@ -154,9 +155,9 @@ export function ToolOverlay() {
 
       {measurement && (
         <>
-          <Line points={[toM(measurement.a), toM(measurement.b)]} color="#2a6cff" lineWidth={2} />
+          <Line points={[toMetres(measurement.a), toMetres(measurement.b)]} color={paint.accent} lineWidth={2} />
           <Html
-            position={toM([
+            position={toMetres([
               (measurement.a[0] + measurement.b[0]) / 2,
               (measurement.a[1] + measurement.b[1]) / 2,
               (measurement.a[2] + measurement.b[2]) / 2,
@@ -165,7 +166,11 @@ export function ToolOverlay() {
             // Cap below the cutlist overlay (z-index 50) so it can't float over it.
             zIndexRange={[40, 0]}
           >
-            <span className="measure-label">
+            {/* Read from across the model, not from the sidebar, so the size is
+                set in px rather than rem — the rem scale is anchored to the
+                13px panel chrome and `text-base` would land at 13px too. The
+                shadow keeps it legible over a light plywood face. */}
+            <span className="rounded border border-accent bg-surface/95 px-2 py-1 text-[14px] leading-none font-semibold whitespace-nowrap text-ink shadow-md shadow-black/50 tabular-nums">
               {formatMeasurement(distance(measurement.a, measurement.b), unit)}
             </span>
           </Html>

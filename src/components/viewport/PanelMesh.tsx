@@ -2,16 +2,16 @@ import { useRef } from 'react'
 import { Mesh } from 'three'
 import { Edges, TransformControls } from '@react-three/drei'
 import type { Panel } from '../../types/panel'
-import { MM_TO_M, panelBoxSize } from '../../lib/geometry'
+import { MM_TO_M, panelBoxSize, toMetres } from '../../lib/geometry'
 import { findMaterial } from '../../lib/materials'
 import { roundToUnitGrid } from '../../lib/units'
-import { SNAP_THRESHOLD_MM, snapGroupDelta } from '../../lib/snapping'
+import { SNAP_THRESHOLD_MM, snapGroupDelta, snapHintFromTarget } from '../../lib/snapping'
 import { useDesignStore } from '../../store/designStore'
 import { ResizeHandles } from './ResizeHandles'
+import { palette } from './palette'
+import { useGesture, type GestureSpec } from './useGesture'
 
 type Vec3 = [number, number, number]
-
-const toMetres = ([x, y, z]: Vec3): Vec3 => [x * MM_TO_M, y * MM_TO_M, z * MM_TO_M]
 
 /** A gesture that moved the primary less than this (mm) is a click, not a drag. */
 const MOVE_THRESHOLD_MM = 0.5
@@ -42,10 +42,6 @@ export function PanelMesh({ panel }: { panel: Panel }) {
   const movePanelsLive = useDesignStore((s) => s.movePanelsLive)
   const commitPanelsMove = useDesignStore((s) => s.commitPanelsMove)
   const restorePanels = useDesignStore((s) => s.restorePanels)
-  const armSelectSuppression = useDesignStore((s) => s.armSelectSuppression)
-  const startGesture = useDesignStore((s) => s.startGesture)
-  const setGestureDelta = useDesignStore((s) => s.setGestureDelta)
-  const setGestureEditable = useDesignStore((s) => s.setGestureEditable)
   const clearGesture = useDesignStore((s) => s.clearGesture)
   const setSnapHints = useDesignStore((s) => s.setSnapHints)
   const panels = useDesignStore((s) => s.panels)
@@ -54,6 +50,8 @@ export function PanelMesh({ panel }: { panel: Panel }) {
   const precision = useDesignStore((s) => s.precision)
   const color = useDesignStore((s) => findMaterial(s.materials, panel.materialId).color)
 
+  const paint = palette()
+  const gesture = useGesture()
   const hidden = panel.hidden === true
   const selected = selectedIds.includes(panel.id)
   // The last-selected panel carries the move gizmo for the whole group.
@@ -65,7 +63,6 @@ export function PanelMesh({ panel }: { panel: Panel }) {
   // Which single axis the gizmo is dragging (null for a plane drag), and whether
   // a readout gesture has been opened this drag.
   const axisRef = useRef<0 | 1 | 2 | null>(null)
-  const gestureOpen = useRef(false)
 
   const size = toMetres(panelBoxSize(panel))
   const position = toMetres(panel.position)
@@ -92,34 +89,30 @@ export function PanelMesh({ panel }: { panel: Panel }) {
     )
   }
 
-  // Open the corner readout for a single-axis drag: its apply/commit/cancel all
+  // What the corner readout does for a single-axis drag: apply/commit/cancel all
   // work from the frozen origin captured at pointer-down.
-  const openGesture = (axis: 0 | 1 | 2, origin: { id: string; position: Vec3 }[]) => {
-    startGesture({
-      kind: 'move',
-      label: AXIS_NAME[axis],
-      delta: 0,
-      editable: false,
-      apply: (mm) => {
-        const d: Vec3 = [0, 0, 0]
-        d[axis] = mm
-        applyGroupDelta(origin, d)
-      },
-      commit: () => {
-        commitMoved()
-        clearGesture()
-      },
-      cancel: () => {
-        restorePanels(origin.map((o) => ({ id: o.id, patch: { position: o.position } })))
-        clearGesture()
-      },
-    })
-  }
+  const moveGesture = (axis: 0 | 1 | 2, origin: { id: string; position: Vec3 }[]): GestureSpec => ({
+    kind: 'move',
+    label: AXIS_NAME[axis],
+    apply: (mm) => {
+      const d: Vec3 = [0, 0, 0]
+      d[axis] = mm
+      applyGroupDelta(origin, d)
+    },
+    commit: () => {
+      commitMoved()
+      clearGesture()
+    },
+    cancel: () => {
+      restorePanels(origin.map((o) => ({ id: o.id, patch: { position: o.position } })))
+      clearGesture()
+    },
+  })
 
   const beginDrag = () => {
     groupStart.current = selectedNow().map((p) => ({ id: p.id, position: p.position }))
     axisRef.current = null
-    gestureOpen.current = false
+    gesture.begin()
   }
 
   // Drag: the gizmo moves the primary by a raw delta; snapGroupDelta lands any
@@ -177,28 +170,15 @@ export function PanelMesh({ panel }: { panel: Panel }) {
         if (!snap || !applies(a)) return []
         // One guide per coincident target, so a flush fit shows both faces —
         // only the first is labelled so the words don't stack.
-        return snap.hits.map((h, i) => {
-          const at: Vec3 = [0, 0, 0]
-          const size: Vec3 = [0, 0, 0]
-          for (const k of [0, 1, 2] as const) {
-            if (k === a) at[k] = h.plane
-            else {
-              at[k] = (h.lo[k] + h.hi[k]) / 2
-              size[k] = Math.max(0, h.hi[k] - h.lo[k])
-            }
-          }
-          return { axis: a, kind: h.kind, at, size, label: i === 0 }
-        })
+        return snap.hits.map((hit, i) => snapHintFromTarget(a, hit, i === 0))
       }),
     )
 
     // Live readout for single-axis drags only (a plane drag has no one number).
     if (active !== null) {
-      if (!gestureOpen.current) {
-        openGesture(active, start.map((s) => ({ id: s.id, position: s.position })))
-        gestureOpen.current = true
-      }
-      setGestureDelta(delta[active])
+      gesture.track(delta[active], () =>
+        moveGesture(active, start.map((s) => ({ id: s.id, position: s.position }))),
+      )
     }
   }
 
@@ -217,16 +197,17 @@ export function PanelMesh({ panel }: { panel: Panel }) {
       primaryNow[2] - primaryStart[2],
     )
     if (moved < MOVE_THRESHOLD_MM) {
-      clearGesture()
+      gesture.dismiss()
       restorePanels(start.map((s) => ({ id: s.id, patch: { position: s.position } }))) // undo the sub-mm nudge
       return
     }
-    armSelectSuppression() // the drag-release click mustn't reselect a panel
     if (axisRef.current === null) {
+      // A plane drag has no single number to type, so it commits on release.
+      gesture.suppressNextSelect()
       commitMoved()
-      clearGesture()
+      gesture.dismiss()
     } else {
-      setGestureEditable() // keep the readout open, now typeable
+      gesture.keepForTyping()
     }
   }
 
@@ -259,14 +240,17 @@ export function PanelMesh({ panel }: { panel: Panel }) {
             it rendering opaque. */}
         <meshStandardMaterial
           key={hidden ? 'ghost' : 'solid'}
-          color={hidden ? '#c9ced7' : color}
+          color={hidden ? paint.ghost : color}
           transparent={hidden}
           opacity={hidden ? 0.2 : 1}
           depthWrite={!hidden}
-          emissive={selected ? '#2a6cff' : '#000000'}
+          emissive={selected ? paint.accent : paint.none}
           emissiveIntensity={selected ? 0.35 : 0}
         />
-        <Edges threshold={15} color={selected ? '#2a6cff' : hidden ? '#6a7180' : '#5a4a32'} />
+        <Edges
+          threshold={15}
+          color={selected ? paint.accent : hidden ? paint.ghostEdge : paint.panelEdge}
+        />
       </mesh>
 
       {!hidden && selected && isPrimary && tool === 'move' && (

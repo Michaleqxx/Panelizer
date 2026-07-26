@@ -1,23 +1,17 @@
 import type { Panel } from '../types/panel'
 import { panelBoxSize } from './geometry'
+import {
+  JOINT_TOL,
+  boundsFromCentre,
+  contactRect,
+  overlapsPerpendicular,
+  panelBounds,
+  type Bounds,
+} from './bounds'
 
 /** How close (mm) a panel must be to a snap target before it magnetically
  *  jumps to it while dragging. */
 export const SNAP_THRESHOLD_MM = 15
-
-/** Axis-aligned bounding box of a panel, in millimetres. */
-export interface Bounds {
-  min: [number, number, number]
-  max: [number, number, number]
-}
-
-export function panelBounds(panel: Panel, position = panel.position): Bounds {
-  const size = panelBoxSize(panel)
-  return {
-    min: [0, 1, 2].map((i) => position[i] - size[i] / 2) as [number, number, number],
-    max: [0, 1, 2].map((i) => position[i] + size[i] / 2) as [number, number, number],
-  }
-}
 
 /** Bounds tagged with the axis its thickness runs along (its smallest extent) —
  *  the only axis on which its centre line is a meaningful snap target. */
@@ -29,27 +23,6 @@ function withThinAxis(b: Bounds): ThinBounds {
   const ext = [0, 1, 2].map((i) => b.max[i] - b.min[i])
   const thinAxis = (ext.indexOf(Math.min(...ext)) as 0 | 1 | 2) ?? 0
   return { ...b, thinAxis }
-}
-
-/**
- * Whether a box (centre `position`, size `size`) overlaps the neighbour bounds
- * `n` on both axes *other* than `axis`. Contact (shared boundary) counts as
- * overlap; any gap does not. Used to gate snapping so a face only snaps where
- * the two panels genuinely meet, not where they merely share a coordinate while
- * sitting in different planes.
- */
-function overlapsPerpendicular(
-  position: [number, number, number],
-  size: [number, number, number],
-  n: Bounds,
-  axis: number,
-): boolean {
-  for (let k = 0; k < 3; k++) {
-    if (k === axis) continue
-    const half = size[k] / 2
-    if (position[k] + half < n.min[k] || position[k] - half > n.max[k]) return false
-  }
-  return true
 }
 
 /**
@@ -105,6 +78,30 @@ export interface SnapHint {
 }
 
 /**
+ * Turn a snapped target into the viewport marker for it: the guide sits on the
+ * snapped plane, and on the other two axes spans the contact rectangle — so it
+ * marks only the patch where the faces actually meet, not the whole face.
+ *
+ * Shared by the move drag (which may report several coincident targets at once,
+ * labelling only the first) and the resize drag (always a single target).
+ */
+export function snapHintFromTarget(axis: 0 | 1 | 2, target: SnapHitTarget, label = true): SnapHint {
+  const at: [number, number, number] = [0, 0, 0]
+  const size: [number, number, number] = [0, 0, 0]
+
+  for (const k of [0, 1, 2] as const) {
+    if (k === axis) {
+      at[k] = target.plane
+    } else {
+      at[k] = (target.lo[k] + target.hi[k]) / 2
+      size[k] = Math.max(0, target.hi[k] - target.lo[k])
+    }
+  }
+
+  return { axis, kind: target.kind, at, size, label }
+}
+
+/**
  * Snap a whole group of panels as one rigid body. Each axis is considered
  * independently: across every group member we look for the single closest
  * snap relationship to a non-group neighbour and return the correction that
@@ -144,17 +141,16 @@ export function snapGroupDelta(
     const cands: (SnapHitTarget & { corr: number })[] = []
 
     for (const m of members) {
-      const mSize = panelBoxSize(m.panel)
-      const half = mSize[axis] / 2
+      const mBounds = boundsFromCentre(m.position, panelBoxSize(m.panel))
       const centre = m.position[axis]
-      const min = centre - half
-      const max = centre + half
+      const min = mBounds.min[axis]
+      const max = mBounds.max[axis]
       for (const n of neighbours) {
         // Only snap this axis if the two panels actually overlap on the *other*
         // two axes — i.e. their faces could really meet here. Without this a
         // panel passing a distant block in a different plane would snap to it in
         // empty space, drawing an intersection guide where nothing touches.
-        if (!overlapsPerpendicular(m.position, mSize, n, axis)) continue
+        if (!overlapsPerpendicular(mBounds, n, axis)) continue
         const nMin = n.min[axis]
         const nMax = n.max[axis]
         const nCentre = (nMin + nMax) / 2
@@ -162,21 +158,32 @@ export function snapGroupDelta(
         // The contact rectangle: where the two boxes overlap on every axis. The
         // guide is drawn from this (minus the snap axis) so it marks only the
         // patch where the faces meet, not the whole dragged face.
-        const lo = [0, 1, 2].map((i) => Math.max(m.position[i] - mSize[i] / 2, n.min[i])) as [number, number, number]
-        const hi = [0, 1, 2].map((i) => Math.min(m.position[i] + mSize[i] / 2, n.max[i])) as [number, number, number]
+        const { lo, hi } = contactRect(mBounds, n)
         const at = (corr: number, plane: number, kind: SnapKind) => cands.push({ corr, plane, kind, lo, hi })
 
         if (min < nMax && max > nMin) {
           at(nMin - min, nMin, 'butt') // align low edges
           at(nMax - max, nMax, 'butt') // align high edges
-          // Only co-centre against a neighbour whose *thickness* runs along this
-          // axis (its face is perpendicular to the drag): that centre is a real
-          // mid-thickness reference. Skip panels that merely span the axis — the
-          // centre of a shelf's width isn't something to snap to.
-          if (axis === n.thinAxis) at(nCentre - centre, nCentre, 'middle')
         } else {
           at(nMax - min, nMax, 'butt') // our min butts their max
           at(nMin - max, nMin, 'butt') // our max butts their min
+        }
+
+        // The neighbour's centre line, offered as a peer of its faces exactly
+        // like `snapResizeFace` does — either of our faces may land on it, and
+        // so may our centre (co-centring two parallel panels). Landing a *face*
+        // there is the dado/rabbet reference: a shelf dropped onto the
+        // mid-thickness of a side. Offered whether or not we already overlap,
+        // since a dado is usually approached from outside.
+        //
+        // Only against a neighbour whose *thickness* runs along this axis (its
+        // face is perpendicular to the drag): that centre is a real
+        // mid-thickness reference. Skip panels that merely span the axis — the
+        // centre of a shelf's width isn't something to snap to.
+        if (axis === n.thinAxis) {
+          at(nCentre - centre, nCentre, 'middle') // co-centre
+          at(nCentre - min, nCentre, 'middle') // our low face onto their centre
+          at(nCentre - max, nCentre, 'middle') // our high face onto their centre
         }
       }
     }
@@ -194,12 +201,11 @@ export function snapGroupDelta(
     // plane AND contact rectangle, so several panels meeting the SAME plane (e.g.
     // a side butting the ends of two rails + the bottom) each light up — a
     // plane-only key would collapse them into one.
-    const CONTACT_TOL = 1.5
     const seen = new Set<string>()
     const hits: SnapHitTarget[] = []
     for (const c of cands) {
       if (Math.abs(c.corr) >= threshold) continue
-      if (Math.abs(c.corr - win.corr) > 0.5 && Math.abs(c.corr) > CONTACT_TOL) continue
+      if (Math.abs(c.corr - win.corr) > 0.5 && Math.abs(c.corr) > JOINT_TOL) continue
       const r = (v: number) => Math.round(v)
       const key = `${r(c.plane)}|${c.lo.map(r).join(',')}|${c.hi.map(r).join(',')}`
       if (seen.has(key)) continue
@@ -241,9 +247,8 @@ export function snapResizeFace(
   others: Panel[],
   threshold: number,
 ): FaceSnap {
-  const size = panelBoxSize(panel)
-  const half = size[axis] / 2
-  const faceStart = panel.position[axis] + faceSign * half
+  const self = boundsFromCentre(panel.position, panelBoxSize(panel))
+  const faceStart = faceSign === 1 ? self.max[axis] : self.min[axis]
   const faceNow = faceStart + rawDelta
 
   // Nearest target wins — a neighbour's two faces (`butt`) plus, for panels
@@ -255,11 +260,10 @@ export function snapResizeFace(
   for (const other of others) {
     const b = withThinAxis(panelBounds(other))
     // Only snap to neighbours the resized face actually spans in-plane.
-    if (!overlapsPerpendicular(panel.position, size, b, axis)) continue
+    if (!overlapsPerpendicular(self, b, axis)) continue
     // Contact rectangle: the panel-vs-neighbour overlap, so the guide marks only
     // where they meet. On the resize axis it's pinned to the snapped plane below.
-    const lo = [0, 1, 2].map((i) => Math.max(panel.position[i] - size[i] / 2, b.min[i])) as [number, number, number]
-    const hi = [0, 1, 2].map((i) => Math.min(panel.position[i] + size[i] / 2, b.max[i])) as [number, number, number]
+    const { lo, hi } = contactRect(self, b)
     const targets: [number, SnapKind][] = [
       [b.min[axis], 'butt'],
       [b.max[axis], 'butt'],

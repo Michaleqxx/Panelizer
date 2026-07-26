@@ -120,50 +120,75 @@ export function evaluateMeasurement(raw: string, currentMm: number, defaultUnit:
   const text = normalizeFractions(raw).trim()
   if (!text) return null
 
-  const isOp = (t: string) => t === '+' || t === '-' || t === '*' || t === '/'
+  const tokens = tokenize(padOperators(text))
 
-  // Make spaces optional around operators. `+` and `*` never appear inside a
-  // number, so pad them freely. A `-` is only an operator when it directly
-  // follows a value (digit / inch-mark / `)`); a leading or post-operator `-`
-  // stays the sign of a negative literal. `/` is left alone — bare `3/4` is a
-  // fraction (and `600/2` reads the same either way).
-  const padded = text
+  // No operators: a plain measurement — keep the existing unit-aware behaviour,
+  // including adopting an explicitly typed unit.
+  if (!tokens.some((t) => 'op' in t)) {
+    const mm = parseMeasurement(text, defaultUnit)
+    return mm === null ? null : { mm, explicitUnit: detectDisplayUnit(text) }
+  }
+
+  // An expression always keeps the box's own unit.
+  const mm = foldExpression(tokens, currentMm, defaultUnit)
+  return mm === null ? null : { mm, explicitUnit: null }
+}
+
+/** One element of a field expression: an operator, or a value term (which may
+ *  itself be a multi-word mixed number like `23 3/4`). */
+type Token = { op: string } | { term: string }
+
+const isOperator = (t: string) => t === '+' || t === '-' || t === '*' || t === '/'
+
+/**
+ * Make spaces optional around operators. `+` and `*` never appear inside a
+ * number, so pad them freely. A `-` is only an operator when it directly
+ * follows a value (digit / inch-mark / `)`); a leading or post-operator `-`
+ * stays the sign of a negative literal. `/` is left alone — bare `3/4` is a
+ * fraction (and `600/2` reads the same either way).
+ */
+function padOperators(text: string): string {
+  return text
     .replace(/^\//, '/ ') // leading `/` is a relative divide (`/2` halves)
     .replace(/([+*])/g, ' $1 ')
     .replace(/([\d"')])\s*-\s*/g, '$1 - ')
+}
 
-  // Split on whitespace, then regroup consecutive value tokens into single
-  // terms so a mixed fraction like "23 3/4" survives as one operand.
-  const seq: ({ op: string } | { term: string })[] = []
+/** Split on whitespace, regrouping consecutive value tokens into single terms
+ *  so a mixed fraction like `23 3/4` survives as one operand. */
+function tokenize(padded: string): Token[] {
+  const tokens: Token[] = []
   let buffer: string[] = []
   const flush = () => {
     if (buffer.length) {
-      seq.push({ term: buffer.join(' ') })
+      tokens.push({ term: buffer.join(' ') })
       buffer = []
     }
   }
+
   for (const token of padded.split(/\s+/).filter(Boolean)) {
-    if (isOp(token)) {
+    if (isOperator(token)) {
       flush()
-      seq.push({ op: token })
+      tokens.push({ op: token })
     } else {
       buffer.push(token)
     }
   }
   flush()
 
-  // No operators: a plain measurement — keep the existing unit-aware behaviour,
-  // including adopting an explicitly typed unit.
-  if (!seq.some((s) => 'op' in s)) {
-    const mm = parseMeasurement(text, defaultUnit)
-    return mm === null ? null : { mm, explicitUnit: detectDisplayUnit(text) }
-  }
+  return tokens
+}
 
-  // Expression: fold left to right. A leading operator starts from the box's
-  // current value; the result stays in the box's unit.
+/**
+ * Fold a token sequence strictly left to right (no precedence). A leading
+ * operator starts from `currentMm`, the box's existing value, so `+3` adds to
+ * what's already there. Returns null if any operand fails to parse.
+ */
+function foldExpression(tokens: Token[], currentMm: number, defaultUnit: Unit): number | null {
+  const first = tokens[0]
   let acc: number
   let i: number
-  const first = seq[0]
+
   if ('op' in first) {
     acc = currentMm
     i = 0
@@ -174,22 +199,24 @@ export function evaluateMeasurement(raw: string, currentMm: number, defaultUnit:
     i = 1
   }
 
-  for (; i < seq.length; i += 2) {
-    const opTok = seq[i]
-    const termTok = seq[i + 1]
-    if (!opTok || !('op' in opTok) || !termTok || !('term' in termTok)) return null
-    const op = opTok.op
+  for (; i < tokens.length; i += 2) {
+    const opToken = tokens[i]
+    const termToken = tokens[i + 1]
+    if (!opToken || !('op' in opToken) || !termToken || !('term' in termToken)) return null
+
+    const op = opToken.op
     if (op === '+' || op === '-') {
-      const m = parseMeasurement(termTok.term, defaultUnit)
+      const m = parseMeasurement(termToken.term, defaultUnit)
       if (m === null) return null
       acc = op === '+' ? acc + m : acc - m
     } else {
-      const n = parseNumeric(termTok.term) // `*` / `/` take a plain scalar
+      const n = parseNumeric(termToken.term) // `*` / `/` take a plain scalar
       if (n === null || (op === '/' && n === 0)) return null
       acc = op === '*' ? acc * n : acc / n
     }
   }
-  return { mm: acc, explicitUnit: null }
+
+  return acc
 }
 
 function parseNumeric(part: string): number | null {
@@ -236,24 +263,57 @@ const glyphs = (n: number, table: string[]) =>
     .map((d) => table[Number(d)])
     .join('')
 
-function formatInches(value: number): string {
-  const sign = value < 0 ? '-' : ''
-  const abs = Math.abs(value)
-  const whole = Math.floor(abs)
-
-  let numerator = Math.round((abs - whole) * 64)
-  let denominator = 64
-  if (numerator === 64) return `${sign}${whole + 1}`
-  if (numerator === 0) return `${sign}${whole}`
-
+/** Reduce a sixty-fourth to lowest terms. The denominator is always a power of
+ *  two, so halving while both parts are even is enough — no GCD needed. */
+function reduceFraction(numerator: number, denominator: number): [number, number] {
   while (numerator % 2 === 0 && denominator % 2 === 0) {
     numerator /= 2
     denominator /= 2
   }
+  return [numerator, denominator]
+}
+
+/** An inch value split into the pieces both renderings need. */
+function inchParts(value: number) {
+  const sign = value < 0 ? '-' : ''
+  const abs = Math.abs(value)
+  const whole = Math.floor(abs)
+  const sixtyFourths = Math.round((abs - whole) * 64)
+
+  if (sixtyFourths === 64) return { sign, whole: whole + 1, fraction: null }
+  if (sixtyFourths === 0) return { sign, whole, fraction: null }
+
+  const [numerator, denominator] = reduceFraction(sixtyFourths, 64)
+  return { sign, whole, fraction: { numerator, denominator } }
+}
+
+function formatInches(value: number): string {
+  const { sign, whole, fraction } = inchParts(value)
+  if (!fraction) return `${sign}${whole}`
+
   // Compact mixed number: no space between whole and fraction, fraction drawn
   // small (`23³⁄₄`). A bare fraction (whole 0) drops the leading `0`.
-  const fraction = `${glyphs(numerator, SUP)}⁄${glyphs(denominator, SUB)}`
-  return whole > 0 ? `${sign}${whole}${fraction}` : `${sign}${fraction}`
+  const glyph = `${glyphs(fraction.numerator, SUP)}⁄${glyphs(fraction.denominator, SUB)}`
+  return whole > 0 ? `${sign}${whole}${glyph}` : `${sign}${glyph}`
+}
+
+/**
+ * The same value as {@link formatMeasurement}, but written in plain ASCII
+ * (`23 3/4`) instead of compact glyphs (`23³⁄₄`).
+ *
+ * This is what a field shows while it has focus. The glyph form is lovely to
+ * read in a table but miserable to edit — the caret has to step through
+ * single-character superscripts and a fraction slash, and backspacing leaves
+ * nonsense. Only the display form differs; both parse back to the same value.
+ */
+export function formatMeasurementPlain(mm: number, unit: Unit): string {
+  if (unit !== 'inch') return formatMeasurement(mm, unit)
+
+  const { sign, whole, fraction } = inchParts(fromMm(mm, unit))
+  if (!fraction) return `${sign}${whole}`
+
+  const plain = `${fraction.numerator}/${fraction.denominator}`
+  return whole > 0 ? `${sign}${whole} ${plain}` : `${sign}${plain}`
 }
 
 /** Reverse of the compact inch glyphs, so a displayed value (`23³⁄₄`) still

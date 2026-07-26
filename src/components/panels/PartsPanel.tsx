@@ -1,14 +1,21 @@
 import { useMemo, useState } from 'react'
 import type { Panel } from '../../types/panel'
-import { buildParts, partNames, partsToCsv } from '../../lib/parts'
+import { buildParts, partsToCsv } from '../../lib/parts'
 import { formatMeasurement, UNIT_SUFFIX, type Unit } from '../../lib/units'
 import { useDesignStore } from '../../store/designStore'
 import { useTooltip } from '../ui/useTooltip'
+import { Button } from '../ui/Button'
+import { Hint, Section, Swatch } from '../ui/Panel'
+import { PartNames } from '../ui/PartNames'
+import { cx } from '../ui/cx'
 
 type PartRow = ReturnType<typeof buildParts>[number]
 
 /** Stable identity for a group row, so expand state survives re-derivation. */
 const groupKey = (r: PartRow) => `${r.length}x${r.width}x${r.thickness}@${r.material}`
+
+const NUM = 'px-1.5 py-1.5 text-right tabular-nums'
+const TXT = 'px-1.5 py-1.5 text-left'
 
 /** Live list of the project's parts, derived from the panels. Identical parts
  *  are grouped and counted; a group can be expanded to reach each panel on its
@@ -45,28 +52,43 @@ export function PartsPanel() {
   }
 
   return (
-    <section className="sidebar__section parts">
-      <div className="sidebar__header">
-        <h2>Parts</h2>
-        <button onClick={copyCsv} disabled={rows.length === 0}>
+    <Section
+      title="Parts"
+      action={
+        <Button size="sm" onClick={copyCsv} disabled={rows.length === 0}>
           Copy CSV
-        </button>
-      </div>
-
+        </Button>
+      }
+    >
       {rows.length === 0 ? (
-        <p className="parts__empty">No panels yet.</p>
+        <Hint>No panels yet.</Hint>
       ) : (
-        <table className="parts__table">
+        // Fixed layout: a long part name must eat into its own column and
+        // truncate, never squeeze the measurements into a multi-line wrap.
+        <table className="w-full table-fixed border-collapse text-[13px]">
+          <colgroup>
+            <col className="w-7" />
+            <col className="w-5" />
+            <col className="w-8" />
+            <col />
+            <col className="w-[6.5rem]" />
+            <col className="w-14" />
+            <col className="w-24" />
+          </colgroup>
           <thead>
-            <tr>
-              <th className="parts__toggle-col" />
-              <th>Qty</th>
-              <th>Part</th>
-              <th>Length</th>
-              <th>Width</th>
-              <th>Thick.</th>
-              <th>Material</th>
-              <th className="parts__eye-col" />
+            <tr className="label-micro border-b border-edge-strong">
+              {/* Visibility leads: it's the control you reach for while reading
+                  down the list, so it gets the leftmost, easiest column. */}
+              <th />
+              <th />
+              <th className={NUM}>Qty</th>
+              <th className={TXT}>Part</th>
+              {/* Length and width share a column: eight columns will not fit a
+                  sidebar, and the pair reads as one measurement anyway. The CSV
+                  export still carries them separately. */}
+              <th className={NUM}>Size</th>
+              <th className={NUM}>Thick.</th>
+              <th className={TXT}>Material</th>
             </tr>
           </thead>
           <tbody>
@@ -95,6 +117,8 @@ export function PartsPanel() {
                           key={id}
                           panel={child}
                           name={r.parts[i]}
+                          index={i}
+                          last={i === r.ids.length - 1}
                           selected={selectedIds.includes(id)}
                           onSelect={() => select(id)}
                           onToggleHidden={() => setHidden([id], !child.hidden)}
@@ -108,18 +132,38 @@ export function PartsPanel() {
         </table>
       )}
 
-      <p className="parts__total">
+      <p className="text-micro mt-2 mb-0 text-ink-faint">
         {panels.length} panel{panels.length === 1 ? '' : 's'} · {rows.length} unique part
         {rows.length === 1 ? '' : 's'} · dimensions in {UNIT_SUFFIX[unit]}
       </p>
-    </section>
+    </Section>
   )
 }
 
-/** A grouped parts row: expand chevron (multi-part groups only), the shared
- *  dimensions, and an eye that hides/shows the whole group. Clicking the row
- *  cycles the selection through its panels. Its expanded child rows are passed
- *  in as `children` so they sit directly beneath it in the table body. */
+/** A chevron that points right when closed and down when open. */
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cx('transition-transform duration-100', open && 'rotate-90')}
+      aria-hidden
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  )
+}
+
+/** A grouped parts row: visibility eye, expand chevron (multi-part groups
+ *  only), the shared dimensions. Clicking the row cycles the selection through
+ *  its panels. Its expanded child rows are passed in as `children` so they sit
+ *  directly beneath it in the table body. */
 function GroupRow({
   row,
   unit,
@@ -147,36 +191,54 @@ function GroupRow({
 
   return (
     <>
-      <tr className={selected ? 'is-selected' : ''} onClick={onSelect} {...tip.trigger}>
-        <td className="parts__toggle-col">
-          {expandable && (
-            <button
-              className={`parts__chevron ${open ? 'is-open' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleOpen()
-              }}
-              aria-label={open ? 'Collapse group' : 'Expand group'}
-            >
-              ▸
-            </button>
-          )}
-        </td>
-        <td>{row.quantity}</td>
-        <td className="parts__name">{partNames(row.parts)}</td>
-        <td>{fmt(row.length)}</td>
-        <td>{fmt(row.width)}</td>
-        <td>{fmt(row.thickness)}</td>
-        <td className="parts__material">
-          <span className="parts__swatch" style={{ background: row.color }} /> {row.material}
-          {tip.node}
-        </td>
-        <td className="parts__eye-col">
+      <tr
+        className={cx(
+          'cursor-pointer transition-colors',
+          // An open group reads as a header for the rows it owns: it keeps the
+          // raised surface and drops its bottom rule so it joins onto them.
+          open ? 'bg-surface-2' : 'border-b border-edge/60 hover:bg-surface-2',
+          selected && 'bg-accent/20 hover:bg-accent/25',
+        )}
+        onClick={onSelect}
+        {...tip.trigger}
+      >
+        <td className="pl-1">
           <EyeButton
             hidden={allHidden}
             onToggle={onToggleHidden}
             label={allHidden ? 'Show all in group' : 'Hide all in group'}
           />
+        </td>
+        <td>
+          {expandable && (
+            <button
+              type="button"
+              className="flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0.5 text-ink-dim hover:bg-surface-3 hover:text-ink"
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleOpen()
+              }}
+              aria-label={open ? 'Collapse group' : 'Expand group'}
+              aria-expanded={open}
+            >
+              <Chevron open={open} />
+            </button>
+          )}
+        </td>
+        <td className={cx(NUM, 'text-ink-dim')}>{row.quantity}</td>
+        <td className={cx(TXT, 'overflow-hidden font-medium text-ink')}>
+          <PartNames names={row.parts} />
+        </td>
+        <td className={cx(NUM, 'whitespace-nowrap')}>
+          {fmt(row.length)} × {fmt(row.width)}
+        </td>
+        <td className={NUM}>{fmt(row.thickness)}</td>
+        <td className={cx(TXT, 'overflow-hidden')}>
+          <span className="flex items-center gap-1.5">
+            <Swatch color={row.color} />
+            <span className="truncate text-ink-dim">{row.material}</span>
+          </span>
+          {tip.node}
         </td>
       </tr>
       {children}
@@ -185,34 +247,51 @@ function GroupRow({
 }
 
 /** One panel inside an expanded group: its own name, selectable and hideable
- *  independently of its siblings. */
+ *  independently of its siblings. Sits on a recessed surface behind a left rail
+ *  so it clearly belongs to the group above it. */
 function ChildRow({
   panel,
   name,
+  index,
+  last,
   selected,
   onSelect,
   onToggleHidden,
 }: {
   panel: Panel
   name: string
+  index: number
+  last: boolean
   selected: boolean
   onSelect: () => void
   onToggleHidden: () => void
 }) {
   return (
-    <tr className={`parts__child ${selected ? 'is-selected' : ''} ${panel.hidden ? 'is-hidden' : ''}`} onClick={onSelect}>
-      <td className="parts__toggle-col" />
-      <td />
-      <td className="parts__name" colSpan={4}>
-        {name}
-      </td>
-      <td className="parts__eye-col">
+    <tr
+      className={cx(
+        'cursor-pointer bg-bg/60 text-[12px] transition-colors hover:bg-surface-2',
+        selected && 'bg-accent/20 hover:bg-accent/25',
+        last && 'border-b border-edge-strong',
+        panel.hidden && 'text-ink-faint',
+      )}
+      onClick={onSelect}
+    >
+      <td className="pl-1">
         <EyeButton
           hidden={panel.hidden === true}
           onToggle={onToggleHidden}
           label={panel.hidden ? 'Show panel' : 'Hide panel'}
         />
       </td>
+      {/* The rail runs down the chevron column, tying every child to its group. */}
+      <td>
+        <span className="ml-[6px] block h-6 w-px bg-edge-strong" />
+      </td>
+      <td className={cx(NUM, 'text-ink-faint')}>{index + 1}</td>
+      <td className={cx(TXT, 'overflow-hidden text-ink-dim')} colSpan={3}>
+        {name}
+      </td>
+      <td />
     </tr>
   )
 }
@@ -222,7 +301,11 @@ function ChildRow({
 function EyeButton({ hidden, onToggle, label }: { hidden: boolean; onToggle: () => void; label: string }) {
   return (
     <button
-      className={`parts__eye ${hidden ? 'is-off' : ''}`}
+      type="button"
+      className={cx(
+        'flex cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 transition-colors',
+        hidden ? 'text-ink-faint hover:text-ink-dim' : 'text-ink-dim hover:bg-surface-3 hover:text-ink',
+      )}
       onClick={(e) => {
         e.stopPropagation()
         onToggle()

@@ -6,6 +6,9 @@ export const MM_TO_M = 0.001
 
 type Vec3 = [number, number, number]
 
+/** Convert a millimetre point/size into the metres the scene renders in. */
+export const toMetres = ([x, y, z]: Vec3): Vec3 => [x * MM_TO_M, y * MM_TO_M, z * MM_TO_M]
+
 /**
  * Map a panel's logical dimensions onto a world-space box size `[x, y, z]`.
  *

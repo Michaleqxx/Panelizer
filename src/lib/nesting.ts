@@ -134,42 +134,71 @@ function splitFree(free: FreeRect, used: FreeRect): FreeRect[] {
   return pieces
 }
 
-/** Place a part in a bin using best-short-side-fit. Returns true if it fit. */
-function placeInBin(bin: Bin, panel: Panel, kerf: number, margin: number): boolean {
-  let best:
-    | { score1: number; score2: number; x: number; y: number; rw: number; rh: number; w: number; h: number; rotated: boolean }
-    | null = null
+/** A chosen spot for a part: where it goes, at what footprint, and how much of
+ *  the free rectangle it reserves once the saw gap is added. */
+interface Fit {
+  x: number
+  y: number
+  /** Reserved footprint — the part plus a kerf on the right/bottom. */
+  reservedW: number
+  reservedH: number
+  w: number
+  h: number
+  rotated: boolean
+}
+
+/**
+ * The best spot for a part in this bin, by best-short-side-fit: the free
+ * rectangle that leaves the smallest leftover on its shorter side, ties broken
+ * by the longer side. Returns null when no orientation fits anywhere.
+ */
+function findBestFit(bin: Bin, panel: Panel, kerf: number): Fit | null {
+  let best: Fit | null = null
+  let bestShort = Infinity
+  let bestLong = Infinity
 
   for (const f of footprints(panel)) {
-    const rw = f.w + kerf // reserved footprint (leaves a saw gap on right/bottom)
-    const rh = f.h + kerf
+    const reservedW = f.w + kerf
+    const reservedH = f.h + kerf
     for (const fr of bin.free) {
-      if (rw > fr.w || rh > fr.h) continue
-      const leftoverW = fr.w - rw
-      const leftoverH = fr.h - rh
-      const score1 = Math.min(leftoverW, leftoverH) // best short-side fit
-      const score2 = Math.max(leftoverW, leftoverH)
-      if (!best || score1 < best.score1 || (score1 === best.score1 && score2 < best.score2)) {
-        best = { score1, score2, x: fr.x, y: fr.y, rw, rh, w: f.w, h: f.h, rotated: f.rotated }
+      if (reservedW > fr.w || reservedH > fr.h) continue
+      const leftoverW = fr.w - reservedW
+      const leftoverH = fr.h - reservedH
+      const short = Math.min(leftoverW, leftoverH)
+      const long = Math.max(leftoverW, leftoverH)
+      if (short < bestShort || (short === bestShort && long < bestLong)) {
+        bestShort = short
+        bestLong = long
+        best = { x: fr.x, y: fr.y, reservedW, reservedH, w: f.w, h: f.h, rotated: f.rotated }
       }
     }
   }
 
-  if (!best) return false
+  return best
+}
 
-  const used: FreeRect = { x: best.x, y: best.y, w: best.rw, h: best.rh }
-  bin.free = bin.free.flatMap((fr) => splitFree(fr, used))
-  bin.free = bin.free.filter((r, i) => !bin.free.some((o, j) => j !== i && contains(o, r)))
+/** Record a placement and carve its reserved footprint out of the free space. */
+function commitPlacement(bin: Bin, panel: Panel, fit: Fit, margin: number): void {
+  const used: FreeRect = { x: fit.x, y: fit.y, w: fit.reservedW, h: fit.reservedH }
+  const split = bin.free.flatMap((fr) => splitFree(fr, used))
+  bin.free = split.filter((r, i) => !split.some((o, j) => j !== i && contains(o, r)))
   bin.placements.push({
     panelId: panel.id,
     name: panel.name,
-    x: margin + best.x,
-    y: margin + best.y,
-    w: best.w,
-    h: best.h,
-    rotated: best.rotated,
+    x: margin + fit.x,
+    y: margin + fit.y,
+    w: fit.w,
+    h: fit.h,
+    rotated: fit.rotated,
   })
   bin.usedArea += panel.length * panel.width
+}
+
+/** Place a part in a bin using best-short-side-fit. Returns true if it fit. */
+function placeInBin(bin: Bin, panel: Panel, kerf: number, margin: number): boolean {
+  const fit = findBestFit(bin, panel, kerf)
+  if (!fit) return false
+  commitPlacement(bin, panel, fit, margin)
   return true
 }
 
@@ -215,93 +244,36 @@ export function generateCutlist(
   const groups: StockGroup[] = []
   const unplaced: UnplacedPart[] = []
 
-  // Group panels by material + thickness (the identity of a stock).
-  const byKey = new Map<string, Panel[]>()
-  for (const panel of panels) {
-    const key = `${panel.materialId}@${panel.thickness}`
-    const list = byKey.get(key)
-    if (list) list.push(panel)
-    else byKey.set(key, [panel])
-  }
-
-  for (const [key, groupPanels] of byKey) {
-    const [materialId, thicknessStr] = key.split('@')
-    const thickness = Number(thicknessStr)
-    const material = findMaterial(materials, materialId)
+  for (const group of groupByStock(panels)) {
+    const material = findMaterial(materials, group.materialId)
     const matching = stocks.filter(
-      (s) => s.materialId === materialId && Math.abs(s.thickness - thickness) < THICKNESS_TOL,
+      (s) => s.materialId === group.materialId && Math.abs(s.thickness - group.thickness) < THICKNESS_TOL,
     )
 
-    const unfit = (panel: Panel, reason: UnplacedPart['reason']) =>
-      unplaced.push({ panelId: panel.id, name: panel.name, reason, materialId, materialName: material.name, thickness })
+    const report = (panel: Panel, reason: UnplacedPart['reason']) =>
+      unplaced.push({
+        panelId: panel.id,
+        name: panel.name,
+        reason,
+        materialId: group.materialId,
+        materialName: material.name,
+        thickness: group.thickness,
+      })
 
     if (matching.length === 0) {
-      for (const p of groupPanels) unfit(p, 'no-stock')
+      for (const panel of group.panels) report(panel, 'no-stock')
       continue
     }
 
-    // Inventory, smallest sheet first — so offcuts / small sheets are opened
-    // before full sheets, and a new sheet is always the smallest that fits.
-    const inventory: Slot[] = matching
-      .map((stock) => ({
-        stock,
-        uL: stock.length - 2 * margin,
-        uW: stock.width - 2 * margin,
-        remaining: stock.quantity == null ? Infinity : stock.quantity,
-      }))
-      .sort((a, b) => area(a.stock.length, a.stock.width) - area(b.stock.length, b.stock.width))
-
-    const fitsAnyStock = (panel: Panel) => inventory.some((s) => fitsUsable(panel, s.uL, s.uW))
-
-    // First-fit-decreasing: tackle the biggest parts first.
-    const sorted = [...groupPanels].sort(
-      (a, b) => Math.max(b.length, b.width) - Math.max(a.length, a.width),
-    )
-
-    const bins: Bin[] = []
-    for (const panel of sorted) {
-      if (!fitsAnyStock(panel)) {
-        unfit(panel, 'too-big')
-        continue
-      }
-
-      // Try existing open sheets, smallest first (fill offcuts before big ones).
-      const openSmallestFirst = [...bins].sort((a, b) => area(a.length, a.width) - area(b.length, b.width))
-      let placed = false
-      for (const bin of openSmallestFirst) {
-        if (placeInBin(bin, panel, kerf, margin)) {
-          placed = true
-          break
-        }
-      }
-      if (placed) continue
-
-      // Open a new sheet: the smallest available stock that fits this part.
-      const slot = inventory.find((s) => s.remaining > 0 && fitsUsable(panel, s.uL, s.uW))
-      if (!slot) {
-        unfit(panel, 'no-space') // fits a stock size, but the quantity ran out
-        continue
-      }
-      slot.remaining -= 1
-      const bin: Bin = {
-        length: slot.stock.length,
-        width: slot.stock.width,
-        // Bin gets one extra kerf so a part reserved as (size + kerf) still sits
-        // flush to the far margin.
-        free: [{ x: 0, y: 0, w: slot.uL + kerf, h: slot.uW + kerf }],
-        placements: [],
-        usedArea: 0,
-      }
-      placeInBin(bin, panel, kerf, margin)
-      bins.push(bin)
-    }
+    const packed = packGroup(group.panels, buildInventory(matching, margin), kerf, margin)
+    for (const { panel, reason } of packed.unplaced) report(panel, reason)
 
     groups.push({
-      key,
+      key: group.key,
       materialName: material.name,
       color: material.color,
-      thickness,
-      sheets: bins.map((b, i) => ({
+      thickness: group.thickness,
+      sheets: packed.bins.map((b, i) => ({
         index: i + 1,
         length: b.length,
         width: b.width,
@@ -312,4 +284,95 @@ export function generateCutlist(
   }
 
   return { groups, unplaced }
+}
+
+/** One material + thickness worth of parts — the identity of a stock item. */
+interface PanelGroup {
+  key: string
+  materialId: string
+  thickness: number
+  panels: Panel[]
+}
+
+/** Group panels by material + thickness, the way a shop keys its sheet goods:
+ *  "Plywood 18 mm" is a different stock than "Melamine 18 mm" or "Plywood 12 mm". */
+function groupByStock(panels: Panel[]): PanelGroup[] {
+  const byKey = new Map<string, PanelGroup>()
+
+  for (const panel of panels) {
+    const key = `${panel.materialId}@${panel.thickness}`
+    const group = byKey.get(key)
+    if (group) group.panels.push(panel)
+    else byKey.set(key, { key, materialId: panel.materialId, thickness: panel.thickness, panels: [panel] })
+  }
+
+  return [...byKey.values()]
+}
+
+/** The stock available to a group, smallest sheet first — so offcuts and small
+ *  sheets are opened before full ones, and a new sheet is always the smallest
+ *  that fits. */
+function buildInventory(matching: Stock[], margin: number): Slot[] {
+  return matching
+    .map((stock) => ({
+      stock,
+      uL: stock.length - 2 * margin,
+      uW: stock.width - 2 * margin,
+      remaining: stock.quantity == null ? Infinity : stock.quantity,
+    }))
+    .sort((a, b) => area(a.stock.length, a.stock.width) - area(b.stock.length, b.stock.width))
+}
+
+interface PackResult {
+  bins: Bin[]
+  unplaced: { panel: Panel; reason: UnplacedPart['reason'] }[]
+}
+
+/**
+ * Pack one group's panels onto its inventory, first-fit-decreasing: biggest
+ * parts first, filling already-open sheets (smallest first) before opening a
+ * new sheet of the smallest stock that fits. Consumes `inventory` quantities as
+ * sheets are opened, so the packer never invents stock that isn't available.
+ */
+function packGroup(panels: Panel[], inventory: Slot[], kerf: number, margin: number): PackResult {
+  const bins: Bin[] = []
+  const unplaced: PackResult['unplaced'] = []
+  const fitsAnyStock = (panel: Panel) => inventory.some((s) => fitsUsable(panel, s.uL, s.uW))
+
+  // First-fit-decreasing: tackle the biggest parts first.
+  const sorted = [...panels].sort((a, b) => Math.max(b.length, b.width) - Math.max(a.length, a.width))
+
+  for (const panel of sorted) {
+    if (!fitsAnyStock(panel)) {
+      unplaced.push({ panel, reason: 'too-big' })
+      continue
+    }
+
+    // Try existing open sheets, smallest first (fill offcuts before big ones).
+    // `some` short-circuits on the first sheet that takes it.
+    const openSmallestFirst = [...bins].sort((a, b) => area(a.length, a.width) - area(b.length, b.width))
+    if (openSmallestFirst.some((bin) => placeInBin(bin, panel, kerf, margin))) continue
+
+    // Open a new sheet: the smallest available stock that fits this part.
+    const slot = inventory.find((s) => s.remaining > 0 && fitsUsable(panel, s.uL, s.uW))
+    if (!slot) {
+      unplaced.push({ panel, reason: 'no-space' }) // fits a stock size, but the quantity ran out
+      continue
+    }
+
+    slot.remaining -= 1
+    const bin: Bin = {
+      length: slot.stock.length,
+      width: slot.stock.width,
+      // Bin gets one extra kerf so a part reserved as (size + kerf) still sits
+      // flush to the far margin.
+      free: [{ x: 0, y: 0, w: slot.uL + kerf, h: slot.uW + kerf }],
+      placements: [],
+      usedArea: 0,
+    }
+    placeInBin(bin, panel, kerf, margin)
+    bins.push(bin)
+  }
+
+  return { bins, unplaced }
 }

@@ -23,7 +23,10 @@ export function useTooltip(text: string) {
 
   const node = pos
     ? createPortal(
-        <div className="tooltip" style={{ left: pos.x, top: pos.y }}>
+        <div
+          className="pointer-events-none fixed z-[100] translate-x-3 translate-y-3 rounded border border-edge bg-surface px-1.5 py-1 text-xs whitespace-nowrap text-ink shadow-lg shadow-black/40"
+          style={{ left: pos.x, top: pos.y }}
+        >
           {text}
         </div>,
         document.body,

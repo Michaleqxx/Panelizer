@@ -8,7 +8,9 @@ import { Viewport } from './components/viewport/Viewport'
 import { ViewportControls } from './components/viewport/ViewportControls'
 import { GestureReadout } from './components/viewport/GestureReadout'
 import { ResizableSidebar } from './components/layout/ResizableSidebar'
+import { ConfirmHost } from './components/ui/ConfirmDialog'
 import { useDesignStore } from './store/designStore'
+import { useSharedLink } from './components/layout/useSharedLink'
 
 /** Whether a keystroke should be left to the focused field rather than treated
  *  as a global shortcut. */
@@ -19,6 +21,8 @@ const isTyping = (el: EventTarget | null): boolean =>
 export default function App() {
   const undo = useDesignStore((s) => s.undo)
   const redo = useDesignStore((s) => s.redo)
+
+  useSharedLink()
 
   // Global undo / redo. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes (both
   // conventions work). Skipped while typing in a field so text edits keep their
@@ -40,10 +44,10 @@ export default function App() {
   }, [undo, redo])
 
   return (
-    <div className="app">
+    <div className="flex h-full flex-col">
       <Toolbar />
-      <main className="workspace">
-        <div className="workspace__viewport">
+      <main className="flex min-h-0 flex-1 print:hidden">
+        <div className="relative min-w-0 flex-1">
           <Viewport />
           <ViewportControls />
           <GestureReadout />
@@ -55,6 +59,7 @@ export default function App() {
         </ResizableSidebar>
       </main>
       <CutlistModal />
+      <ConfirmHost />
     </div>
   )
 }

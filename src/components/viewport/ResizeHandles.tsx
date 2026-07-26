@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Vector3 } from 'three'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
 import type { Panel } from '../../types/panel'
-import { MM_TO_M, axisField, panelBoxSize } from '../../lib/geometry'
+import { MM_TO_M, axisField, panelBoxSize, toMetres } from '../../lib/geometry'
 import { roundToUnitGrid } from '../../lib/units'
 import { resizeAlongAxis } from '../../lib/resize'
-import { SNAP_THRESHOLD_MM, snapResizeFace, type SnapHitTarget } from '../../lib/snapping'
+import { SNAP_THRESHOLD_MM, snapHintFromTarget, snapResizeFace, type SnapHitTarget } from '../../lib/snapping'
 import { useDesignStore } from '../../store/designStore'
+import { palette } from './palette'
+import { useGesture, type GestureSpec } from './useGesture'
 
 type Axis3 = 0 | 1 | 2
 type FaceSign = 1 | -1
@@ -25,12 +27,6 @@ function faceCenterMm(panel: Panel, axis: Axis3, faceSign: FaceSign): [number, n
   center[axis] += faceSign * half
   return center
 }
-
-const toM = ([x, y, z]: [number, number, number]): [number, number, number] => [
-  x * MM_TO_M,
-  y * MM_TO_M,
-  z * MM_TO_M,
-]
 
 /** What we freeze at pointer-down so every move is computed against an
  *  immutable starting state — this is what stops the resize from feeding back
@@ -58,10 +54,6 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
   const resizePanelLive = useDesignStore((s) => s.resizePanelLive)
   const restorePanels = useDesignStore((s) => s.restorePanels)
   const setOrbit = useDesignStore((s) => s.setOrbitEnabled)
-  const armSelectSuppression = useDesignStore((s) => s.armSelectSuppression)
-  const startGesture = useDesignStore((s) => s.startGesture)
-  const setGestureDelta = useDesignStore((s) => s.setGestureDelta)
-  const setGestureEditable = useDesignStore((s) => s.setGestureEditable)
   const clearGesture = useDesignStore((s) => s.clearGesture)
   const setSnapHints = useDesignStore((s) => s.setSnapHints)
   const unit = useDesignStore((s) => s.unit)
@@ -71,9 +63,10 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
   const invalidate = useThree((s) => s.invalidate)
 
   const drag = useRef<DragStart | null>(null)
-  const gestureOpen = useRef(false)
   const lastDelta = useRef(0)
   const [hovered, setHovered] = useState(false)
+  const paint = palette()
+  const gesture = useGesture()
 
   // Safety net: if this handle unmounts mid-gesture (tool switch, deselect),
   // make sure orbit is turned back on and no snap guide is left hanging.
@@ -91,7 +84,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
 
   // Faint slab marking the whole face (visual only — never a click target).
   const box = panelBoxSize(panel)
-  const slabSize = toM(box.map((v, i) => (i === axis ? 6 : v)) as [number, number, number])
+  const slabSize = toMetres(box.map((v, i) => (i === axis ? 6 : v)) as [number, number, number])
 
   // Position (m) of the pointer ray projected onto this face's drag axis: the
   // closest point between the axis line (through the frozen point `p0`, along
@@ -116,17 +109,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
   // Show (or clear) the snap guide, drawn on the contact rectangle (the overlap
   // of the two panels) so it marks only where the faces meet.
   const showSnap = (snap: SnapHitTarget | null) => {
-    if (!snap) return setSnapHints([])
-    const at: [number, number, number] = [0, 0, 0]
-    const size: [number, number, number] = [0, 0, 0]
-    for (const k of [0, 1, 2] as const) {
-      if (k === axis) at[k] = snap.plane
-      else {
-        at[k] = (snap.lo[k] + snap.hi[k]) / 2
-        size[k] = Math.max(0, snap.hi[k] - snap.lo[k])
-      }
-    }
-    setSnapHints([{ axis, kind: snap.kind, at, size }])
+    setSnapHints(snap ? [snapHintFromTarget(axis, snap)] : [])
   }
 
   const label = axisField(panel.normal, axis) === 'length' ? 'Length' : 'Width'
@@ -152,38 +135,34 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
     updatePanel(panel.id, { [result.field]: size, position })
   }
 
-  // Open the corner readout for this resize: apply/commit/cancel all work from
-  // the frozen start panel captured at pointer-down.
-  const openGesture = (startPanel: Panel, symmetric: boolean) => {
-    startGesture({
-      kind: 'resize',
-      label,
-      delta: 0,
-      editable: false,
-      apply: (mm) => {
-        lastDelta.current = mm
-        applyFrom(startPanel, mm, symmetric, false)
-      },
-      commit: () => {
-        applyFrom(startPanel, lastDelta.current, symmetric, true)
-        clearGesture()
-      },
-      cancel: () => {
-        const original = resizeAlongAxis(startPanel, axis, faceSign, 0, symmetric)
-        if (original) {
-          restorePanels([{ id: panel.id, patch: { [original.field]: original.value, position: original.position } }])
-        }
-        clearGesture()
-      },
-    })
-  }
+  // What the corner readout does for this resize: apply/commit/cancel all work
+  // from the frozen start panel captured at pointer-down.
+  const resizeGesture = (startPanel: Panel, symmetric: boolean): GestureSpec => ({
+    kind: 'resize',
+    label,
+    apply: (mm) => {
+      lastDelta.current = mm
+      applyFrom(startPanel, mm, symmetric, false)
+    },
+    commit: () => {
+      applyFrom(startPanel, lastDelta.current, symmetric, true)
+      clearGesture()
+    },
+    cancel: () => {
+      const original = resizeAlongAxis(startPanel, axis, faceSign, 0, symmetric)
+      if (original) {
+        restorePanels([{ id: panel.id, patch: { [original.field]: original.value, position: original.position } }])
+      }
+      clearGesture()
+    },
+  })
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture(e.pointerId)
     setOrbit(false)
-    gestureOpen.current = false
-    const p0 = new Vector3(...toM(faceCenter))
+    gesture.begin()
+    const p0 = new Vector3(...toMetres(faceCenter))
     drag.current = { panel, p0, param0: axisParam(e.ray, p0) }
   }
 
@@ -204,11 +183,11 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
     }
     lastDelta.current = deltaMm
     applyFrom(drag.current.panel, deltaMm, e.nativeEvent.altKey, false)
-    if (!gestureOpen.current) {
-      openGesture(drag.current.panel, e.nativeEvent.altKey)
-      gestureOpen.current = true
-    }
-    setGestureDelta(deltaMm)
+
+    const startPanel = drag.current.panel
+    const symmetric = e.nativeEvent.altKey
+    gesture.track(deltaMm, () => resizeGesture(startPanel, symmetric))
+
     showSnap(fs.snap)
     invalidate()
   }
@@ -223,23 +202,19 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
     drag.current = null
     setOrbit(true)
     setSnapHints([]) // the guide belongs to the live drag only
-    if (Math.abs(deltaMm) >= CLICK_THRESHOLD_MM) {
-      armSelectSuppression() // don't let the drag-release click select a panel
-      setGestureEditable() // keep the readout open, now typeable
-    } else {
-      clearGesture()
-    }
+    if (Math.abs(deltaMm) >= CLICK_THRESHOLD_MM) gesture.keepForTyping()
+    else gesture.dismiss()
   }
 
   return (
     <>
       {/* Non-interactive face tint so it's obvious which dimension a handle grows. */}
-      <mesh position={toM(faceCenter)} raycast={() => null}>
+      <mesh position={toMetres(faceCenter)} raycast={() => null}>
         <boxGeometry args={slabSize} />
-        <meshBasicMaterial color="#ff8a2a" transparent opacity={hovered ? 0.25 : 0.08} depthWrite={false} />
+        <meshBasicMaterial color={paint.resize} transparent opacity={hovered ? 0.25 : 0.08} depthWrite={false} />
       </mesh>
 
-      <group position={toM(handleCenter)}>
+      <group position={toMetres(handleCenter)}>
         {/* Larger invisible sphere makes the handle easy to grab. */}
         <mesh
           onPointerOver={(e) => {
@@ -261,7 +236,7 @@ function FaceHandle({ panel, axis, faceSign }: { panel: Panel; axis: Axis3; face
         {/* Visible ball (non-interactive; the hit sphere above owns pointers). */}
         <mesh raycast={() => null}>
           <sphereGeometry args={[HANDLE_RADIUS_M, 16, 16]} />
-          <meshBasicMaterial color={hovered ? '#ffab5e' : '#ff8a2a'} depthTest={false} />
+          <meshBasicMaterial color={hovered ? paint.resizeHover : paint.resize} depthTest={false} />
         </mesh>
       </group>
     </>
